@@ -1,318 +1,356 @@
-# CheckOps Form Builder Submission SDK
+# CheckOps Form Builder SDK
 
-A complete SDK for validating and submitting CheckOps Form Builder submissions with both client-side validation and full backend server implementation. It provides pluggable validation, normalized payload creation, and a comprehensive HTTP wrapper for creating submissions from browser or server runtimes.
+A comprehensive, reusable NPM library for building and managing forms, submissions, and validation in any Node.js application.
 
-## 🚀 Phase 2 Complete - Full Backend Implementation
-
-This SDK now includes a complete backend implementation with:
-
-- ✅ **Server-side Database Layer** - PostgreSQL 13+ with JSONB support
-- ✅ **Counter-based ID Generation** - Atomic, sequential ID generation
-- ✅ **Complete Backend APIs** - Forms, submissions, and API key management
-- ✅ **Data Integrity Checks** - Database constraints, transactions, and audit logging
-- ✅ **Security Layer** - API key authentication, rate limiting, and permissions
-- ✅ **Comprehensive Tests** - Unit and integration test coverage
-- ✅ **Documentation** - Complete API documentation and setup guides
-
-## 📦 Installation
+## 🚀 Installation
 
 ```bash
-npm install @checkops/form-builder-submission-sdk
-# or
-pnpm add @checkops/form-builder-submission-sdk
+npm install @saiqa-tech/checkops
+```
+
+**Peer Dependencies**: This package requires PostgreSQL to be installed in your project:
+```bash
+npm install pg
 ```
 
 ## 🎯 Quick Start
 
-### Client-side SDK Usage
+### Basic Usage
 
-```ts
-import { FormBuilderSubmissionSDK, type FormSchema } from '@checkops/form-builder-submission-sdk';
+```typescript
+import { 
+  FormService, 
+  SubmissionService, 
+  SecurityService,
+  ValidationService,
+  IdGenerator,
+  createPool 
+} from '@saiqa-tech/checkops';
 
-const schema: FormSchema = {
-  id: 'contact-form',
-  version: '1.0.0',
-  fields: [
-    { name: 'fullName', type: 'text', required: true },
-    { name: 'email', type: 'email', required: true },
-    { name: 'subscribe', type: 'boolean', defaultValue: false }
-  ]
-};
-
-const sdk = new FormBuilderSubmissionSDK({
-  baseUrl: 'https://api.checkops.dev',
-  apiKey: process.env.CHECKOPS_API_KEY
+// Initialize database connection
+const pool = createPool({
+  host: 'localhost',
+  port: 5432,
+  database: 'your_database',
+  user: 'your_username',
+  password: 'your_password'
 });
 
-const result = await sdk.submit(schema, {
-  fullName: 'Jane Doe',
-  email: 'jane@example.com'
-});
-
-console.log(result.response?.status); // 201
-console.log(result.payload); // normalized payload that was sent
+// Initialize services
+const formService = new FormService(pool);
+const submissionService = new SubmissionService(pool);
+const securityService = new SecurityService(pool, 'your-jwt-secret');
+const validationService = new ValidationService(pool);
+const idGenerator = new IdGenerator(pool);
 ```
 
-### Backend Server Setup
+### Create a Form
 
-```bash
-# Clone the repository
-git clone https://github.com/saiqa-tech/checkops.git
-cd checkops
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your database configuration
-
-# Run database migrations
-npm run migrate
-
-# Start the server
-npm run dev
-```
-
-## 📚 Documentation
-
-### Client SDK Documentation
-- [API Reference](#api-reference)
-- [Validation Rules](#validation-rules)
-- [Error Handling](#error-handling)
-
-### Backend Documentation
-- [Backend Setup Guide](./BACKEND.md)
-- [API Endpoints](./BACKEND.md#api-structure)
-- [Security Features](./BACKEND.md#security-features)
-- [Database Schema](./BACKEND.md#database-schema)
-
-## 🔧 Features
-
-### Client-side SDK
-- **Form Validation**: Comprehensive client-side validation with custom rules
-- **Type Safety**: Full TypeScript support with type definitions
-- **Flexible Submission**: Support for dry runs and custom transformations
-- **Error Handling**: Detailed error information and warnings
-- **Browser & Node**: Works in both browser and server environments
-
-### Backend Server
-- **Database Integration**: PostgreSQL with optimized JSONB storage
-- **Authentication**: Secure API key-based authentication with permissions
-- **Rate Limiting**: Configurable rate limiting per API key and endpoint
-- **Audit Logging**: Complete audit trail for all operations
-- **API Management**: Full CRUD operations for forms and submissions
-- **Security**: CORS, security headers, input validation, and sanitization
-
-## 🎨 Validation Rules
-
-The SDK supports comprehensive field validation:
-
-```ts
-const schema: FormSchema = {
-  id: 'advanced-form',
-  fields: [
-    {
-      name: 'name',
-      type: 'text',
-      required: true,
-      minLength: 2,
-      maxLength: 100,
-      pattern: /^[a-zA-Z\s]+$/
-    },
-    {
-      name: 'age',
-      type: 'integer',
-      required: true,
-      min: 18,
-      max: 120
-    },
-    {
-      name: 'email',
-      type: 'email',
-      required: true
-    },
-    {
-      name: 'interests',
-      type: 'multi-select',
-      options: [
-        { value: 'tech', label: 'Technology' },
-        { value: 'sports', label: 'Sports' },
-        { value: 'music', label: 'Music' }
-      ]
-    },
-    {
-      name: 'profile',
-      type: 'json',
-      validator: (value, field, payload) => {
-        if (!value.social) return 'Social media links required';
+```typescript
+const form = await formService.createForm({
+  title: 'Contact Form',
+  description: 'A simple contact form',
+  schema: {
+    id: 'contact-form',
+    fields: [
+      {
+        name: 'name',
+        label: 'Full Name',
+        type: 'text',
+        required: true
+      },
+      {
+        name: 'email',
+        label: 'Email Address',
+        type: 'email',
+        required: true
+      },
+      {
+        name: 'message',
+        label: 'Message',
+        type: 'textarea',
+        required: true
       }
-    }
-  ]
-};
-```
-
-## 🔐 Security Features
-
-### API Key Authentication
-```ts
-// Create API key with specific permissions
-const apiKeyResponse = await fetch('/api/v1/api-keys', {
-  method: 'POST',
-  headers: { 'Authorization': 'Bearer admin_key' },
-  body: JSON.stringify({
-    name: 'Production API Key',
-    permissions: ['forms:read', 'submissions:create'],
-    rateLimitPerHour: 1000
-  })
+    ]
+  },
+  createdBy: 'user-123'
 });
 ```
 
-### Rate Limiting
-- Configurable per API key
-- Endpoint-specific limits
-- Graceful degradation
-- Detailed headers
+### Handle Submissions
 
-### Data Integrity
-- Database constraints
-- Transaction management
-- Audit logging
-- Input validation
+```typescript
+const submission = await submissionService.createSubmission({
+  formId: 'contact-form',
+  data: {
+    name: 'John Doe',
+    email: 'john@example.com',
+    message: 'Hello from the CheckOps SDK!'
+  },
+  submittedBy: 'user-123'
+});
+
+console.log('Submission created:', submission.id);
+```
+
+### API Key Security
+
+```typescript
+// Create an API key
+const { apiKey, apiKeyData } = await securityService.createApiKey({
+  name: 'Production API Key',
+  permissions: ['forms:read', 'submissions:create', 'submissions:read'],
+  rateLimitPerHour: 1000,
+  createdBy: 'admin-user'
+});
+
+// Authenticate requests
+const authResult = await securityService.authenticate({
+  apiKey: 'your-api-key-here'
+});
+
+if (authResult.isValid) {
+  // Use authResult.apiKey for authorized operations
+  const hasPermission = await securityService.checkPermission(
+    authResult.apiKey,
+    'forms:delete'
+  );
+}
+```
+
+### Data Validation
+
+```typescript
+// Create validation rules
+await validationService.createValidationRule({
+  fieldId: 'email',
+  type: 'email',
+  parameters: {},
+  errorMessage: 'Please enter a valid email address'
+});
+
+// Validate submission data
+const validationResult = await validationService.validateSubmission(
+  { email: 'invalid-email' },
+  'contact-form'
+);
+
+if (!validationResult.isValid) {
+  console.error('Validation errors:', validationResult.errors);
+} else {
+  console.log('Validated data:', validationResult.validatedData);
+}
+```
+
+### ID Generation
+
+```typescript
+// Generate sequential IDs
+const formId = await idGenerator.getNextId('forms'); // e.g., forms_123
+const submissionId = await idGenerator.getNextId('submissions'); // e.g., submissions_456
+
+// Reset counter
+await idGenerator.resetCounter('forms', 1);
+```
+
+## 🔧 Advanced Features
+
+### Custom Validation
+
+```typescript
+// Create custom validation rules
+await validationService.createValidationRule({
+  fieldId: 'phone',
+  type: 'custom',
+  parameters: { 
+    pattern: '^\\+?[0-9]{7,15}$',
+    message: 'Please enter a valid phone number'
+  },
+  errorMessage: 'Invalid phone number format'
+});
+```
+
+### Submission History
+
+```typescript
+import { SubmissionHistoryService } from '@saiqa-tech/checkops';
+
+const historyService = new SubmissionHistoryService(pool);
+
+// Create history entry
+await historyService.createHistoryEntry({
+  submissionId: 'submission-123',
+  action: 'updated',
+  oldData: { status: 'pending' },
+  newData: { status: 'processed' },
+  reason: 'Manual review completed',
+  performedBy: 'admin-user'
+});
+
+// Get submission history
+const history = await historyService.getHistoryBySubmissionId('submission-123');
+```
+
+### Search Functionality
+
+```typescript
+// Full-text search forms
+const searchResults = await formService.searchForms('contact', 20);
+
+// Search submissions
+const submissionResults = await submissionService.searchSubmissions('john@example.com', 10);
+```
+
+## 🔒 Security Features
+
+### API Key Management
+
+- **Secure key generation** with bcrypt hashing
+- **Granular permissions** system
+- **Rate limiting** per API key
+- **JWT token** generation and verification
+- **Key expiration** support
+
+### Built-in Permissions
+
+- `forms:*` - Full form management
+- `forms:read` - Read forms only
+- `forms:create` - Create new forms
+- `forms:update` - Update existing forms
+- `forms:delete` - Delete forms
+- `submissions:*` - Full submission management
+- `submissions:read` - Read submissions only
+- `submissions:create` - Create new submissions
+- `submissions:update` - Update submissions
+- `submissions:delete` - Delete submissions
+- `api_keys:*` - Full API key management
+
+## 📊 Analytics & Statistics
+
+```typescript
+// Get submission statistics
+const stats = await submissionService.getSubmissionStats('form-123');
+console.log({
+  total: stats.total,
+  pending: stats.pending,
+  processed: stats.processed,
+  failed: stats.failed
+});
+
+// Get all forms with pagination
+const forms = await formService.getAllForms(20, 0); // 20 forms, offset 0
+```
+
+## 🗂️ Database Requirements
+
+This package requires PostgreSQL 13+ with the following tables (set up by you):
+
+### Required Tables
+
+```sql
+-- Forms table
+CREATE TABLE forms (
+    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    schema JSONB NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_by VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Submissions table
+CREATE TABLE submissions (
+    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+    form_id VARCHAR(255) NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+    data JSONB NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    submitted_by VARCHAR(255),
+    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- API Keys table
+CREATE TABLE api_keys (
+    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+    key_hash VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    permissions JSONB NOT NULL,
+    rate_limit_per_hour INTEGER NOT NULL DEFAULT 1000,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    created_by VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Validation Rules table
+CREATE TABLE validation_rules (
+    id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid(),
+    field_id VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    parameters JSONB NOT NULL,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
 
 ## 🧪 Testing
 
 ```bash
-# Run unit tests
+# Run all tests
 npm test
 
-# Run integration tests (requires test database)
-npm run test:integration
+# Run tests with coverage
+npm run test:coverage
 
 # Run tests in watch mode
 npm run test:watch
 
-# Build the project
-npm run build
+# Type checking
+npm run type-check
 ```
 
-## 📊 API Reference
+## 📚 API Reference
 
-### Client SDK
+### Core Services
 
-#### FormBuilderSubmissionSDK
-- `constructor(config)` - Initialize the SDK
-- `validate(schema, data)` - Validate form data
-- `buildSubmission(schema, data, options)` - Build submission payload
-- `submit(schema, data, options)` - Submit form data
-- `submitPayload(formId, payload, options)` - Submit pre-built payload
+- **FormService**: Complete CRUD operations for forms
+- **SubmissionService**: Handle form submissions with status tracking
+- **SecurityService**: API key authentication and authorization
+- **ValidationService**: Create and manage validation rules
+- **IdGenerator**: Generate sequential, collision-free IDs
+- **SubmissionHistoryService**: Track all submission changes
 
-#### Utilities
-- `validateFormData` - Standalone validation function
-- `httpRequest` - HTTP request utility
+### Database Utilities
 
-#### Core Types
-- `FormSchema` - Form definition
-- `SubmissionPayload` - Submission data structure
-- `SubmissionOptions` - Submission configuration
-- `SubmitResult` - Submission response
-- `ValidationResult` - Validation results
+- **createPool(config)**: Create PostgreSQL connection pool
+- **defaultDatabaseConfig**: Default configuration object
 
-### Backend API
+### Types
 
-#### Forms API
-- `GET /api/v1/forms` - List forms
-- `POST /api/v1/forms` - Create form
-- `GET /api/v1/forms/:id` - Get form
-- `PUT /api/v1/forms/:id` - Update form
-- `DELETE /api/v1/forms/:id` - Delete form
+All services are fully typed with TypeScript. Type definitions are included in the package.
 
-#### Submissions API
-- `POST /api/v1/forms/:id/submissions` - Create submission
-- `GET /api/v1/submissions` - List submissions
-- `GET /api/v1/submissions/:id` - Get submission
-- `PUT /api/v1/submissions/:id/status` - Update status
+## 🚀 Production Deployment
 
-#### API Keys API
-- `GET /api/v1/api-keys` - List API keys
-- `POST /api/v1/api-keys` - Create API key
-- `PUT /api/v1/api-keys/:id` - Update API key
-- `DELETE /api/v1/api-keys/:id` - Delete API key
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Client SDK    │    │   Backend API   │    │   PostgreSQL    │
-│                 │    │                 │    │     Database    │
-│ • Validation    │◄──►│ • Auth & Auth   │◄──►│                 │
-│ • HTTP Client   │    │ • Rate Limiting │    │ • JSONB Storage │
-│ • Type Safety   │    │ • Audit Logging │    │ • Indexes       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-## 🚀 Deployment
-
-### Docker Deployment
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY dist ./dist
-EXPOSE 3000
-CMD ["npm", "start"]
-```
-
-### Environment Variables
-```bash
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=checkops
-DB_USER=postgres
-DB_PASSWORD=your_password
-
-# Server
-PORT=3000
-NODE_ENV=production
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Setup
-```bash
-# Install dependencies
-npm install
-
-# Set up test database
-createdb checkops_test
-
-# Run migrations
-npm run migrate
-
-# Start development server
-npm run dev
-
-# Run tests
-npm test
-```
-
-## 📄 License
-
-[MIT](./LICENSE) - see the LICENSE file for details.
+1. **Install dependencies**: `npm install @saiqa-tech/checkops pg`
+2. **Set up database**: Create required tables (see Database Requirements)
+3. **Configure connection**: Use environment variables for database config
+4. **Handle errors**: Implement proper error handling and logging
+5. **Monitor**: Set up monitoring for API key usage and performance
 
 ## 🔗 Links
 
-- [Backend Documentation](./BACKEND.md)
-- [API Documentation](./BACKEND.md#api-structure)
-- [Database Schema](./BACKEND.md#database-schema)
-- [Security Guide](./BACKEND.md#security-features)
-- [Examples](./examples/)
-- [GitHub Repository](https://github.com/saiqa-tech/checkops)
+- **NPM Package**: https://www.npmjs.com/package/@saiqa-tech/checkops
+- **GitHub Repository**: https://github.com/saiqa-tech/checkops
+- **Documentation**: See [NPM_SETUP.md](./NPM_SETUP.md) for detailed usage
+- **Examples**: See [examples/](./examples/) directory for code samples
+
+## 📄 License
+
+MIT License - see [LICENSE](./LICENSE) file for details.
