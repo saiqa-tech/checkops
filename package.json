@@ -1,0 +1,44 @@
+{
+  "name": "@checkops/form-builder-submission-sdk",
+  "version": "0.1.0",
+  "description": "SDK for validating and submitting CheckOps form builder submissions.",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --sourcemap",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rimraf dist"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "checkops",
+    "form",
+    "sdk",
+    "submission"
+  ],
+  "author": "CheckOps",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.9.0",
+    "rimraf": "^5.0.5",
+    "tslib": "^2.6.2",
+    "tsup": "^7.2.0",
+    "typescript": "^5.2.2",
+    "vitest": "^0.34.6"
+  }
+}
