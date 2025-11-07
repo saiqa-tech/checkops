@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ESNext",
+    "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2020", "DOM"],
     "allowSyntheticDefaultImports": true,
@@ -14,8 +14,9 @@
     "sourceMap": true,
     "outDir": "dist",
     "resolveJsonModule": true,
-    "noEmit": true,
+    "noEmit": false,
     "types": ["vitest/globals"]
   },
-  "include": ["src", "tests", "vitest.config.ts"]
+  "include": ["src", "tests", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist"]
 }
