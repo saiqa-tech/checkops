@@ -1,0 +1,56 @@
+{
+  "name": "@saiqa-tech/checkops",
+  "version": "1.0.0",
+  "description": "A production-ready Node.js npm package that enables developers to create dynamic forms with centralized question reusability and structured data submission capabilities",
+  "main": "src/index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest tests/integration",
+    "test:performance": "NODE_OPTIONS=--experimental-vm-modules jest tests/performance",
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "migrate": "node migrations/run.js",
+    "lint": "eslint src tests",
+    "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\""
+  },
+  "keywords": [
+    "forms",
+    "form-builder",
+    "dynamic-forms",
+    "questionnaire",
+    "survey",
+    "checkops",
+    "submission",
+    "postgresql",
+    "jsonb"
+  ],
+  "author": "Saiqa Tech",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saiqa-tech/checkops.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saiqa-tech/checkops/issues"
+  },
+  "homepage": "https://github.com/saiqa-tech/checkops#readme",
+  "peerDependencies": {
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.2.5"
+  },
+  "files": [
+    "src",
+    "migrations",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ]
+}
