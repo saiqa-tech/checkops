@@ -25,6 +25,7 @@ async function runMigrations() {
       '002_create_question_bank_table.sql',
       '003_create_submissions_table.sql',
       '004_create_id_counters.sql',
+      '005_create_option_history_table.sql',
     ];
 
     for (const file of migrationFiles) {

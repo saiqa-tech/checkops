@@ -1,4 +1,5 @@
 import { ValidationError } from './errors.js';
+import { OptionUtils } from './optionUtils.js';
 
 export function validateEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -198,32 +199,16 @@ export function validateSubmissionData(submissionData, formQuestions) {
       }
     }
 
-    if (
-      (question.questionType === 'select' || question.questionType === 'radio') &&
-      question.options &&
-      Array.isArray(question.options)
-    ) {
-      const validOptions = question.options.map((opt) =>
-        typeof opt === 'string' ? opt : opt.value
-      );
-      if (!validOptions.includes(answer)) {
-        errors.push(`Invalid option selected for question '${questionId}'`);
-      }
-    }
-
-    if (
-      (question.questionType === 'multiselect' || question.questionType === 'checkbox') &&
-      question.options
-    ) {
-      if (!Array.isArray(answer)) {
-        errors.push(`Answer for question '${questionId}' must be an array`);
-      } else {
-        const validOptions = question.options.map((opt) =>
-          typeof opt === 'string' ? opt : opt.value
-        );
-        const invalidAnswers = answer.filter((ans) => !validOptions.includes(ans));
-        if (invalidAnswers.length > 0) {
-          errors.push(`Invalid options selected for question '${questionId}': ${invalidAnswers.join(', ')}`);
+    if (question.options && OptionUtils.requiresOptions(question.questionType)) {
+      if (!OptionUtils.isValidAnswer(answer, question.options, question.questionType)) {
+        if (question.questionType === 'multiselect' || question.questionType === 'checkbox') {
+          if (!Array.isArray(answer)) {
+            errors.push(`Answer for question '${questionId}' must be an array`);
+          } else {
+            errors.push(`Invalid options selected for question '${questionId}'`);
+          }
+        } else {
+          errors.push(`Invalid option selected for question '${questionId}'`);
         }
       }
     }

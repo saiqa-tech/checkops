@@ -9,10 +9,12 @@ A production-ready Node.js npm package that enables developers to create dynamic
 
 - 🎯 **Dynamic Form Builder** - Create forms with flexible question types
 - 🔄 **Question Reusability** - Centralized question bank for reusing questions across forms
+- 🔑 **Stable Option Keys** - Option key-value system prevents data misalignment when labels change
 - 📊 **Structured Data Submission** - Validated and sanitized submission handling
 - 🔐 **Security First** - Built-in input sanitization and parameterized queries
 - 🚀 **PostgreSQL 18 + JSONB** - High-performance database with flexible schema
 - 📈 **Submission Analytics** - Built-in statistics and reporting
+- 📝 **Option History Tracking** - Audit trail for all option label changes
 - 🧪 **80%+ Test Coverage** - Comprehensive unit and integration tests
 - 📖 **Well Documented** - Complete API reference and usage guides
 
@@ -156,12 +158,49 @@ Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 - GitHub Issues: [https://github.com/saiqa-tech/checkops/issues](https://github.com/saiqa-tech/checkops/issues)
 - Documentation: [https://github.com/saiqa-tech/checkops](https://github.com/saiqa-tech/checkops)
 
+## Recent Updates (v2.0.0)
+
+### Option Key-Value System
+CheckOps now includes a stable option key-value system that ensures data integrity when option labels change:
+
+```javascript
+// Create question with simple options (auto-generates keys)
+const question = await checkops.createQuestion({
+  questionText: 'Select Priority',
+  questionType: 'select',
+  options: ['High', 'Medium', 'Low']
+});
+
+// Or use structured options with custom keys
+const question2 = await checkops.createQuestion({
+  questionText: 'Select Department',
+  questionType: 'select',
+  options: [
+    { key: 'dept_eng', label: 'Engineering' },
+    { key: 'dept_sales', label: 'Sales' }
+  ]
+});
+
+// Update labels without breaking existing data
+await checkops.updateOptionLabel(
+  question2.id,
+  'dept_eng',
+  'Engineering & Technology',
+  'admin@example.com'
+);
+
+// Track all label changes
+const history = await checkops.getOptionHistory(question2.id, 'dept_eng');
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for complete migration guide and breaking changes.
+
 ## Roadmap
 
 - [ ] Export submissions to CSV/Excel
 - [ ] Form templates library
 - [ ] Conditional logic for questions
-- [ ] Multi-language support
+- [ ] Multi-language support for options
 - [ ] Email notifications
 - [ ] Webhook integrations
 - [ ] React/Vue components

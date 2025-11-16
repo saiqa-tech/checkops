@@ -180,6 +180,16 @@ export class CheckOps {
     this.ensureInitialized();
     return await this.submissionService.getSubmissionStats(formId);
   }
+
+  async updateOptionLabel(questionId, optionKey, newLabel, changedBy = null) {
+    this.ensureInitialized();
+    return await this.questionService.updateOptionLabel(questionId, optionKey, newLabel, changedBy);
+  }
+
+  async getOptionHistory(questionId, optionKey = null) {
+    this.ensureInitialized();
+    return await this.questionService.getOptionHistory(questionId, optionKey);
+  }
 }
 
 export default CheckOps;
