@@ -1,3 +1,22 @@
+-- Create function to validate unique option keys
+CREATE OR REPLACE FUNCTION validate_unique_option_keys(options JSONB)
+RETURNS BOOLEAN AS $
+BEGIN
+    -- If options is null or not an array, it's valid
+    IF options IS NULL OR jsonb_typeof(options) != 'array' THEN
+        RETURN TRUE;
+    END IF;
+    
+    -- Check if all keys in the options array are unique
+    -- Count total keys vs distinct keys
+    RETURN (
+        SELECT COUNT(*) = COUNT(DISTINCT elem->>'key')
+        FROM jsonb_array_elements(options) AS elem
+        WHERE elem->>'key' IS NOT NULL
+    );
+END;
+$ LANGUAGE plpgsql IMMUTABLE;
+
 -- Create question_bank table
 CREATE TABLE IF NOT EXISTS question_bank (
     id VARCHAR(50) PRIMARY KEY,
@@ -13,7 +32,8 @@ CREATE TABLE IF NOT EXISTS question_bank (
         'text', 'textarea', 'number', 'email', 'phone', 'date', 
         'time', 'datetime', 'select', 'multiselect', 'radio', 
         'checkbox', 'boolean', 'file', 'rating'
-    ))
+    )),
+    CONSTRAINT unique_option_keys CHECK (validate_unique_option_keys(options))
 );
 
 -- Create indexes for efficient querying

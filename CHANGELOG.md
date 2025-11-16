@@ -5,6 +5,114 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-01-16
+
+### Added
+- **Option Key-Value System** - Stable data integrity for option-based questions
+  - Automatic key generation for simple option arrays
+  - Support for structured options with custom keys and labels
+  - Option keys remain stable when labels change
+  - Full backward compatibility with simple string arrays
+- **New API Methods**
+  - `updateOptionLabel()` - Update option labels without affecting data integrity
+  - `getOptionHistory()` - Track all label changes for options
+- **Option History Tracking**
+  - New `question_option_history` table to audit label changes
+  - Track who changed labels and when
+  - Optional change reason field
+- **Enhanced OptionUtils Class**
+  - `processOptions()` - Convert simple arrays or validate structured options
+  - `generateOptionKey()` - Create unique, readable keys
+  - `sanitizeOptionKey()` - Validate and clean option keys
+  - `findOption()` - Find option by key OR label
+  - `convertToKeys()` - Transform labels to keys for storage
+  - `convertToLabels()` - Transform keys to labels for display
+  - `requiresOptions()` - Check if question type needs options
+  - `isValidAnswer()` - Validate answers against options
+- **Automatic Key/Label Conversion**
+  - Submissions accept both keys and labels
+  - Stored responses use stable keys
+  - Retrieved responses display current labels
+  - Stats aggregate by key, display by current label
+
+### Changed
+- **Breaking Change**: Options structure now supports both simple arrays and structured objects
+  - Simple arrays: `['Red', 'Blue', 'Green']` (auto-converted to structured)
+  - Structured: `[{ key: 'color_red', label: 'Red', ... }]`
+- **Submission Data Storage**: Responses now stored using option keys instead of labels
+- **Submission Retrieval**: Added `_rawData` field with original keys for processing
+- **Stats Aggregation**: `answerDistribution` now shows current labels, `_keyDistribution` for internal tracking
+- **Validation**: Updated to use OptionUtils for option-based question validation
+
+### Database
+- **Migration 002 Updated**: Added `unique_option_keys` CHECK constraint
+  - Created `validate_unique_option_keys()` function
+  - Ensures option keys are unique within each question
+- **Migration 005 Added**: Created `question_option_history` table
+  - Tracks all option label changes
+  - Foreign key relationship to question_bank
+  - Indexed for efficient querying
+
+### Migration Guide
+
+#### For Existing Users (v1.x → v2.0)
+
+**Simple Arrays Still Work** (Backward Compatible):
+```javascript
+// This still works - automatically converted to structured format
+await checkops.createQuestion({
+  questionText: 'Select a color',
+  questionType: 'select',
+  options: ['Red', 'Blue', 'Green']
+});
+```
+
+**Recommended: Use Structured Options**:
+```javascript
+// Better approach for production
+await checkops.createQuestion({
+  questionText: 'Select a color',
+  questionType: 'select',
+  options: [
+    { key: 'color_red', label: 'Red' },
+    { key: 'color_blue', label: 'Blue' },
+    { key: 'color_green', label: 'Green' }
+  ]
+});
+```
+
+**Update Labels Without Breaking Data**:
+```javascript
+// Change label while preserving data integrity
+await checkops.updateOptionLabel(
+  'Q-001',
+  'color_red',
+  'Crimson Red',
+  'admin@example.com'
+);
+
+// Track changes
+const history = await checkops.getOptionHistory('Q-001', 'color_red');
+```
+
+**Submissions Accept Both Keys and Labels**:
+```javascript
+// All of these work
+await checkops.createSubmission({
+  formId: 'FORM-001',
+  submissionData: {
+    'Q-001': 'color_red',  // Using key
+    'Q-002': 'Blue',       // Using label (auto-converted to key)
+  }
+});
+```
+
+### Notes
+- All existing data remains intact
+- Simple arrays are automatically converted on first update
+- Existing submissions will display with current labels
+- Run migration 005 to enable option history tracking
+
 ## [1.0.0] - 2024-01-01
 
 ### Added
