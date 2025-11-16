@@ -1,6 +1,6 @@
 -- Create function to validate unique option keys
 CREATE OR REPLACE FUNCTION validate_unique_option_keys(options JSONB)
-RETURNS BOOLEAN AS $
+RETURNS BOOLEAN AS $$
 BEGIN
     -- If options is null or not an array, it's valid
     IF options IS NULL OR jsonb_typeof(options) != 'array' THEN
@@ -15,7 +15,7 @@ BEGIN
         WHERE elem->>'key' IS NOT NULL
     );
 END;
-$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Create question_bank table
 CREATE TABLE IF NOT EXISTS question_bank (
