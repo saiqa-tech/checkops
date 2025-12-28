@@ -5,51 +5,69 @@
 language: en-US
 
 # Path filters - exclude files from review
-path_filters: "!node_modules/**,!package-lock.json,!*.log,!coverage/**,!dist/**,!build/**"
+path_filters: 
+  - "**/*.js"
+  - "**/*.json"
+  - "**/*.md"
+  - "**/*.sql"
+  - "**/*.yaml"
+  - "**/*.yml"
+  - "!node_modules/**"
+  - "!package-lock.json"
+  - "!*.log"
+  - "!coverage/**"
+  - "!dist/**"
+  - "!build/**"
 
-# Ignore draft pull requests
-ignore_draft_pr: true
+# Enable early access features
+early_access: true
 
-# System language
-system_language: en-US
-
-# Disable release notes generation
-release_notes: false
-
-# Enable beta features
-enable_beta_features: true
-
-# File-specific instructions for better reviews
-file_path_instructions:
-  - path: "**/*.js"
-    instructions: |
-      Focus on:
-      - SQL injection prevention in database queries
-      - Proper error handling and logging
-      - Input validation and sanitization
-      - Security best practices for MCP server implementation
-      - Performance optimization
+# Reviews configuration
+reviews:
+  # Auto-review settings
+  auto_review:
+    enabled: true
+    drafts: false  # Ignore draft PRs
   
-  - path: "**/*.sql"
-    instructions: |
-      Ensure:
-      - Migrations are safe and reversible
-      - No SQL injection vulnerabilities
-      - Proper indexing considerations
-      - Data integrity constraints
+  # High-level summary
+  high_level_summary: false
   
-  - path: "**/src/**/*.js"
-    instructions: |
-      Review for:
-      - Proper async/await usage
-      - Error boundary implementation
-      - Memory leak prevention
-      - Security vulnerabilities
+  # Path-specific instructions
+  path_instructions:
+    - path: "**/*.js"
+      instructions: |
+        Focus on:
+        - SQL injection prevention in database queries
+        - Proper error handling and logging
+        - Input validation and sanitization
+        - Security best practices for MCP server implementation
+        - Performance optimization
+    
+    - path: "**/*.sql"
+      instructions: |
+        Ensure:
+        - Migrations are safe and reversible
+        - No SQL injection vulnerabilities
+        - Proper indexing considerations
+        - Data integrity constraints
+    
+    - path: "**/src/**/*.js"
+      instructions: |
+        Review for:
+        - Proper async/await usage
+        - Error boundary implementation
+        - Memory leak prevention
+        - Security vulnerabilities
+  
+  # Tools configuration
+  tools:
+    eslint:
+      enabled: true
 
 # Knowledge base configuration
 knowledge_base:
   code_guidelines:
-    file_patterns:
+    filePatterns:
       - "docs/**/*.md"
       - "README.md"
       - "CONTRIBUTING.md"
@@ -57,9 +75,3 @@ knowledge_base:
 # Chat configuration
 chat:
   auto_reply: false
-
-# Tools configuration for static analysis
-tools:
-  # Enable ESLint if available
-  eslint:
-    enabled: true

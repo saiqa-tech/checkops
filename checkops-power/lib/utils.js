@@ -310,17 +310,18 @@ export const ValidationHelpers = {
                     }
                     break;
 
-                case 'rating':
-                    const rating = parseInt(value);
+                case 'rating': {
+                    const rating = parseInt(value, 10);
                     const validRatings = question.options || [1, 2, 3, 4, 5];
                     if (!validRatings.includes(rating)) {
                         errors.push(`${question.questionText} must be one of: ${validRatings.join(', ')}`);
                     }
                     break;
+                }
 
-                case 'select':
+                case 'select': {
                     if (question.options) {
-                        const validOptions = Array.isArray(question.options[0]) && question.options[0].key
+                        const validOptions = typeof question.options[0] === 'object' && question.options[0]?.key
                             ? question.options.map(opt => opt.key)
                             : question.options;
                         if (!validOptions.includes(value)) {
@@ -328,10 +329,11 @@ export const ValidationHelpers = {
                         }
                     }
                     break;
+                }
 
-                case 'multiselect':
+                case 'multiselect': {
                     if (Array.isArray(value) && question.options) {
-                        const validOptions = Array.isArray(question.options[0]) && question.options[0].key
+                        const validOptions = typeof question.options[0] === 'object' && question.options[0]?.key
                             ? question.options.map(opt => opt.key)
                             : question.options;
                         const invalidValues = value.filter(v => !validOptions.includes(v));
@@ -340,6 +342,7 @@ export const ValidationHelpers = {
                         }
                     }
                     break;
+                }
             }
         });
 
@@ -409,8 +412,16 @@ export const DataHelpers = {
             })
         ]);
 
+        const escapeCell = (cell) => {
+            const str = String(cell || '');
+            // Prevent formula injection
+            const safeStr = /^[=+\-@]/.test(str) ? `'${str}` : str;
+            // Escape double quotes and wrap in quotes
+            return `"${safeStr.replace(/"/g, '""')}"`;
+        };
+
         return [headers, ...rows]
-            .map(row => row.map(cell => `"${cell}"`).join(','))
+            .map(row => row.map(escapeCell).join(','))
             .join('\n');
     },
 

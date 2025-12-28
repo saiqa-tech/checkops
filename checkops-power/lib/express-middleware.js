@@ -11,10 +11,18 @@ import { CheckOpsWrapper } from './CheckOpsWrapper.js';
  */
 export function createCheckOpsMiddleware(config = {}) {
     const wrapper = new CheckOpsWrapper(config);
+    let initialized = false;
+    let initPromise = null;
 
     return async (req, res, next) => {
         try {
-            await wrapper.initialize();
+            if (!initialized) {
+                if (!initPromise) {
+                    initPromise = wrapper.initialize();
+                }
+                await initPromise;
+                initialized = true;
+            }
             req.checkops = wrapper;
             next();
         } catch (error) {
@@ -272,8 +280,8 @@ export function checkOpsErrorHandler() {
  * @param {object} [config] - Configuration forwarded to the CheckOps middleware.
  * @returns {import('express').Router} An Express Router configured with CheckOps middleware, endpoints for forms, submissions, stats, health, metrics, and the CheckOps error handler.
  */
-export function createCheckOpsRouter(config = {}) {
-    const express = await import('express');
+export async function createCheckOpsRouter(config = {}) {
+    const { default: express } = await import('express');
     const router = express.Router();
 
     // Apply CheckOps middleware

@@ -55,7 +55,8 @@ const createCheckOpsInstance = () => {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     ssl: process.env.DB_SSL === 'true' ? {
-      rejectUnauthorized: false, // Configure based on your SSL setup
+      rejectUnauthorized: true, // Secure SSL configuration
+      ca: process.env.DB_SSL_CA, // Path to CA certificate
     } : false,
     max: parseInt(process.env.DB_MAX_CONNECTIONS) || 20,
     idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,

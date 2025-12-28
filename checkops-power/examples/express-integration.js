@@ -59,17 +59,15 @@ async function createExpressApp() {
     });
 
     // CheckOps router with configuration
-    const checkopsRouter = createCheckOpsRouter({
+    const checkopsRouter = await createCheckOpsRouter({
         enableLogging: true,
         enableMetrics: true,
         retryAttempts: 3,
         autoReconnect: true,
     });
 
-    app.use('/api/checkops', checkopsRouter);
-
-    // Custom CheckOps endpoints
-    app.post('/api/forms/template/:templateName', async (req, res) => {
+    // Custom CheckOps endpoints - mount on the router to have access to req.checkops
+    checkopsRouter.post('/forms/template/:templateName', async (req, res) => {
         try {
             const { templateName } = req.params;
             const { FormTemplates } = await import('../lib/utils.js');
@@ -117,6 +115,8 @@ async function createExpressApp() {
             });
         }
     });
+
+    app.use('/api/checkops', checkopsRouter);
 
     // Bulk submission endpoint
     app.post('/api/forms/:formId/submissions/bulk', async (req, res) => {

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import fs from 'fs';
-import path from 'path';
 import { execSync } from 'child_process';
 import readline from 'readline';
 
@@ -371,17 +370,9 @@ export default runCheckOpsExamples;
     fs.writeFileSync('checkops-examples.js', sampleCode);
     console.log('✅ checkops-examples.js created');
   }
-}
 
-// Run setup if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const setup = new CheckOpsSetup();
-  setup.setup();
-}
-
-export default CheckOpsSetup;
   async createWrapperExamples() {
-  const wrapperExample = `import { CheckOpsWrapper, FormBuilder, FormTemplates } from './lib/index.js';
+    const wrapperExample = `import { CheckOpsWrapper, FormBuilder, FormTemplates } from './lib/index.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -462,11 +453,11 @@ if (import.meta.url === \`file://\${process.argv[1]}\`) {
 export default wrapperExample;
 `;
 
-  fs.writeFileSync('checkops-wrapper-example.js', wrapperExample);
-  console.log('✅ checkops-wrapper-example.js created');
+    fs.writeFileSync('checkops-wrapper-example.js', wrapperExample);
+    console.log('✅ checkops-wrapper-example.js created');
 
-  // Create Express integration example
-  const expressExample = `import express from 'express';
+    // Create Express integration example
+    const expressExample = `import express from 'express';
 import { createCheckOpsRouter } from './lib/index.js';
 import dotenv from 'dotenv';
 
@@ -490,7 +481,7 @@ app.get('/', (req, res) => {
 });
 
 // CheckOps routes
-const checkopsRouter = createCheckOpsRouter({
+const checkopsRouter = await createCheckOpsRouter({
   enableLogging: true,
   enableMetrics: true,
 });
@@ -503,6 +494,15 @@ app.listen(port, () => {
 });
 `;
 
-  fs.writeFileSync('checkops-express-example.js', expressExample);
-  console.log('✅ checkops-express-example.js created');
+    fs.writeFileSync('checkops-express-example.js', expressExample);
+    console.log('✅ checkops-express-example.js created');
+  }
 }
+
+// Run setup if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const setup = new CheckOpsSetup();
+  setup.setup();
+}
+
+export default CheckOpsSetup;

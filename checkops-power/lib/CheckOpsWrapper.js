@@ -4,8 +4,32 @@ import EventEmitter from 'events';
 /**
  * CheckOpsWrapper - A convenient wrapper around CheckOps with additional utilities
  * for easier integration into Node.js applications
+ * 
+ * @class CheckOpsWrapper
+ * @extends EventEmitter
+ * @example
+ * const wrapper = new CheckOpsWrapper({
+ *   enableLogging: true,
+ *   enableMetrics: true,
+ *   retryAttempts: 3
+ * });
+ * await wrapper.initialize();
  */
 export class CheckOpsWrapper extends EventEmitter {
+    /**
+     * Create a CheckOpsWrapper instance
+     * @param {Object} config - Configuration options
+     * @param {string} [config.host] - Database host
+     * @param {number} [config.port] - Database port
+     * @param {string} [config.database] - Database name
+     * @param {string} [config.user] - Database user
+     * @param {string} [config.password] - Database password
+     * @param {boolean} [config.autoReconnect=true] - Enable automatic reconnection
+     * @param {number} [config.retryAttempts=3] - Number of retry attempts
+     * @param {number} [config.retryDelay=1000] - Delay between retries in ms
+     * @param {boolean} [config.enableLogging] - Enable logging
+     * @param {boolean} [config.enableMetrics=false] - Enable metrics collection
+     */
     constructor(config = {}) {
         super();
 
@@ -40,6 +64,10 @@ export class CheckOpsWrapper extends EventEmitter {
 
     /**
      * Initialize CheckOps with automatic retry and error handling
+     * @returns {Promise<CheckOps>} The initialized CheckOps instance
+     * @throws {Error} If initialization fails after all retry attempts
+     * @emits CheckOpsWrapper#initialized
+     * @emits CheckOpsWrapper#error
      */
     async initialize() {
         if (this.initialized) {
@@ -55,6 +83,7 @@ export class CheckOpsWrapper extends EventEmitter {
                 await this.checkops.initialize();
 
                 this.initialized = true;
+                this.initTime = Date.now();
                 this.log('CheckOps initialized successfully');
                 this.emit('initialized');
 
@@ -75,6 +104,13 @@ export class CheckOpsWrapper extends EventEmitter {
 
     /**
      * Create a form with validation and error handling
+     * @param {Object} formData - Form configuration object
+     * @param {string} formData.title - Form title
+     * @param {string} [formData.description] - Form description
+     * @param {Array<Object>} formData.questions - Array of question objects
+     * @returns {Promise<Object>} The created form object
+     * @throws {Error} If form validation fails or creation fails
+     * @emits CheckOpsWrapper#formCreated
      */
     async createForm(formData) {
         return this.executeWithMetrics('createForm', async () => {
@@ -88,6 +124,12 @@ export class CheckOpsWrapper extends EventEmitter {
 
     /**
      * Create a submission with validation
+     * @param {Object} submissionData - Submission data object
+     * @param {string|number} submissionData.formId - Form ID
+     * @param {Object} submissionData.submissionData - Submission data
+     * @returns {Promise<Object>} The created submission object
+     * @throws {Error} If submission validation fails or creation fails
+     * @emits CheckOpsWrapper#submissionCreated
      */
     async createSubmission(submissionData) {
         return this.executeWithMetrics('createSubmission', async () => {
@@ -101,6 +143,15 @@ export class CheckOpsWrapper extends EventEmitter {
 
     /**
      * Create a question with validation
+     * @param {Object} questionData - Question configuration object
+     * @param {string} questionData.questionText - Question text
+     * @param {string} questionData.questionType - Question type
+     * @param {Array} [questionData.options] - Question options for select/multiselect
+     * @param {boolean} [questionData.required] - Whether question is required
+     * @param {Object} [questionData.metadata] - Additional metadata
+     * @returns {Promise<Object>} The created question object
+     * @throws {Error} If question validation fails or creation fails
+     * @emits CheckOpsWrapper#questionCreated
      */
     async createQuestion(questionData) {
         return this.executeWithMetrics('createQuestion', async () => {
@@ -114,6 +165,10 @@ export class CheckOpsWrapper extends EventEmitter {
 
     /**
      * Get form with caching support
+     * @param {string|number} formId - Form ID to retrieve
+     * @param {boolean} [useCache=false] - Whether to use cached data
+     * @returns {Promise<Object>} The form object
+     * @throws {Error} If form retrieval fails
      */
     async getForm(formId, useCache = false) {
         return this.executeWithMetrics('getForm', async () => {
@@ -133,6 +188,12 @@ export class CheckOpsWrapper extends EventEmitter {
 
     /**
      * Get submissions with pagination helper
+     * @param {string|number} formId - Form ID to get submissions for
+     * @param {Object} [options={}] - Query options
+     * @param {number} [options.limit=50] - Maximum number of submissions to return
+     * @param {number} [options.offset=0] - Number of submissions to skip
+     * @returns {Promise<Array<Object>>} Array of submission objects
+     * @throws {Error} If submission retrieval fails
      */
     async getSubmissions(formId, options = {}) {
         return this.executeWithMetrics('getSubmissions', async () => {
@@ -148,6 +209,10 @@ export class CheckOpsWrapper extends EventEmitter {
 
     /**
      * Get submission statistics with caching
+     * @param {string|number} formId - Form ID to get statistics for
+     * @param {boolean} [useCache=true] - Whether to use cached data
+     * @returns {Promise<Object>} Statistics object with submission counts and question stats
+     * @throws {Error} If statistics retrieval fails
      */
     async getStats(formId, useCache = true) {
         return this.executeWithMetrics('getStats', async () => {
@@ -168,7 +233,11 @@ export class CheckOpsWrapper extends EventEmitter {
     }
 
     /**
-     * Bulk operations helper
+     * Bulk operations helper for creating multiple submissions
+     * @param {string|number} formId - Form ID to create submissions for
+     * @param {Array<Object>} submissionsData - Array of submission data objects
+     * @returns {Promise<Object>} Object with results, errors, and total count
+     * @throws {Error} If bulk operation setup fails
      */
     async bulkCreateSubmissions(formId, submissionsData) {
         return this.executeWithMetrics('bulkCreateSubmissions', async () => {
@@ -192,7 +261,8 @@ export class CheckOpsWrapper extends EventEmitter {
     }
 
     /**
-     * Health check
+     * Health check to verify CheckOps connection and functionality
+     * @returns {Promise<Object>} Health status object with status, metrics, and timestamp
      */
     async healthCheck() {
         try {
@@ -214,14 +284,20 @@ export class CheckOpsWrapper extends EventEmitter {
     }
 
     /**
-     * Enable simple caching
+     * Enable simple caching with TTL support
+     * @param {number} [ttl=300000] - Time to live in milliseconds (default: 5 minutes)
      */
     enableCache(ttl = 300000) {
-        this.cache = new Map();
+        // Clear existing interval if any
+        if (this.cacheCleanupInterval) {
+            clearInterval(this.cacheCleanupInterval);
+        }
+
+        this.cache = new SimpleCache();
         this.cacheTTL = ttl;
 
         // Simple TTL cleanup
-        setInterval(() => {
+        this.cacheCleanupInterval = setInterval(() => {
             const now = Date.now();
             for (const [key, value] of this.cache.entries()) {
                 if (value.expires && now > value.expires) {
@@ -232,7 +308,8 @@ export class CheckOpsWrapper extends EventEmitter {
     }
 
     /**
-     * Get metrics
+     * Get current metrics and performance statistics
+     * @returns {Object} Metrics object with operations, errors, uptime, and error rate
      */
     getMetrics() {
         return {
@@ -244,9 +321,23 @@ export class CheckOpsWrapper extends EventEmitter {
     }
 
     /**
-     * Close connection
+     * Close connection and cleanup resources
+     * @returns {Promise<void>}
+     * @emits CheckOpsWrapper#closed
      */
     async close() {
+        // Clear cache cleanup interval
+        if (this.cacheCleanupInterval) {
+            clearInterval(this.cacheCleanupInterval);
+            this.cacheCleanupInterval = null;
+        }
+
+        // Clear cache
+        if (this.cache) {
+            this.cache.clear();
+            this.cache = null;
+        }
+
         if (this.checkops) {
             await this.checkops.close();
             this.initialized = false;
@@ -256,6 +347,15 @@ export class CheckOpsWrapper extends EventEmitter {
 
     // Private methods
 
+    /**
+     * Execute an operation with metrics tracking and error handling
+     * @private
+     * @param {string} operation - Operation name for logging
+     * @param {Function} fn - Function to execute
+     * @returns {Promise<*>} Result of the function execution
+     * @throws {Error} If the operation fails
+     * @emits CheckOpsWrapper#operationComplete
+     */
     async executeWithMetrics(operation, fn) {
         await this.ensureInitialized();
 
@@ -283,12 +383,23 @@ export class CheckOpsWrapper extends EventEmitter {
         }
     }
 
+    /**
+     * Ensure CheckOps is initialized before executing operations
+     * @private
+     * @returns {Promise<void>}
+     */
     async ensureInitialized() {
         if (!this.initialized) {
             await this.initialize();
         }
     }
 
+    /**
+     * Validate form data structure and required fields
+     * @private
+     * @param {Object} formData - Form data to validate
+     * @throws {Error} If validation fails
+     */
     validateFormData(formData) {
         if (!formData.title || formData.title.trim() === '') {
             throw new Error('Form title is required');
@@ -299,16 +410,24 @@ export class CheckOpsWrapper extends EventEmitter {
         }
 
         formData.questions.forEach((question, index) => {
-            if (!question.questionText || question.questionText.trim() === '') {
+            // Allow questions with questionId OR questionText
+            if (!question.questionId && (!question.questionText || question.questionText.trim() === '')) {
                 throw new Error(`Question ${index + 1} text is required`);
             }
 
-            if (!question.questionType) {
+            // Only validate questionType if questionId is not provided
+            if (!question.questionId && !question.questionType) {
                 throw new Error(`Question ${index + 1} type is required`);
             }
         });
     }
 
+    /**
+     * Validate submission data structure and required fields
+     * @private
+     * @param {Object} submissionData - Submission data to validate
+     * @throws {Error} If validation fails
+     */
     validateSubmissionData(submissionData) {
         if (!submissionData.formId) {
             throw new Error('Form ID is required for submission');
@@ -319,6 +438,12 @@ export class CheckOpsWrapper extends EventEmitter {
         }
     }
 
+    /**
+     * Validate question data structure and required fields
+     * @private
+     * @param {Object} questionData - Question data to validate
+     * @throws {Error} If validation fails
+     */
     validateQuestionData(questionData) {
         if (!questionData.questionText || questionData.questionText.trim() === '') {
             throw new Error('Question text is required');
@@ -329,25 +454,52 @@ export class CheckOpsWrapper extends EventEmitter {
         }
     }
 
+    /**
+     * Log a message if logging is enabled
+     * @private
+     * @param {string} message - Message to log
+     */
     log(message) {
         if (this.config.enableLogging) {
             console.log(`[CheckOpsWrapper] ${new Date().toISOString()} - ${message}`);
         }
     }
 
+    /**
+     * Create a delay for retry logic
+     * @private
+     * @param {number} ms - Milliseconds to delay
+     * @returns {Promise<void>}
+     */
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 
-// Cache implementation for the wrapper
+/**
+ * Simple cache implementation with TTL support for the CheckOpsWrapper
+ * @class SimpleCache
+ * @extends Map
+ */
 class SimpleCache extends Map {
+    /**
+     * Set a value in the cache with optional TTL
+     * @param {string} key - Cache key
+     * @param {*} value - Value to cache
+     * @param {number} [ttl] - Time to live in milliseconds
+     * @returns {SimpleCache} This cache instance for chaining
+     */
     set(key, value, ttl) {
         const expires = ttl ? Date.now() + ttl : null;
         super.set(key, { value, expires });
         return this;
     }
 
+    /**
+     * Get a value from the cache, checking TTL expiration
+     * @param {string} key - Cache key
+     * @returns {*} Cached value or undefined if not found or expired
+     */
     get(key) {
         const item = super.get(key);
         if (!item) return undefined;
@@ -360,6 +512,11 @@ class SimpleCache extends Map {
         return item.value;
     }
 
+    /**
+     * Check if a key exists in the cache and is not expired
+     * @param {string} key - Cache key
+     * @returns {boolean} True if key exists and is not expired
+     */
     has(key) {
         const item = super.get(key);
         if (!item) return false;

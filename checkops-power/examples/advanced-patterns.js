@@ -100,33 +100,63 @@ class AdvancedCheckOpsService extends EventEmitter {
         if (this.processingQueue) return;
 
         this.processingQueue = true;
+        this.inFlightOperations = 0;
+        this.retryTimers = new Set();
 
-        while (this.processingQueue) {
-            if (this.submissionQueue.length > 0) {
-                const item = this.submissionQueue.shift();
+        this._processorPromise = (async () => {
+            while (this.processingQueue || this.submissionQueue.length > 0 || this.inFlightOperations > 0) {
+                if (this.submissionQueue.length > 0) {
+                    const item = this.submissionQueue.shift();
+                    this.inFlightOperations++;
 
-                try {
-                    const submission = await this.checkops.createSubmission(item.submissionData);
-                    this.emit('queueItemProcessed', { item, submission });
-                } catch (error) {
-                    item.retries++;
+                    try {
+                        const submission = await this.checkops.createSubmission(item.submissionData);
+                        this.emit('queueItemProcessed', { item, submission });
+                    } catch (error) {
+                        item.retries++;
 
-                    if (item.retries < item.maxRetries) {
-                        // Re-queue with delay
-                        setTimeout(() => {
-                            this.submissionQueue.push(item);
-                        }, 1000 * item.retries);
+                        if (item.retries < item.maxRetries) {
+                            // Re-queue with delay
+                            const timer = setTimeout(() => {
+                                this.retryTimers.delete(timer);
+                                this.submissionQueue.push(item);
+                            }, 1000 * item.retries);
 
-                        this.emit('queueItemRetry', { item, error });
-                    } else {
-                        this.emit('queueItemFailed', { item, error });
+                            this.retryTimers.add(timer);
+                            this.emit('queueItemRetry', { item, error });
+                        } else {
+                            this.emit('queueItemFailed', { item, error });
+                        }
+                    } finally {
+                        this.inFlightOperations--;
                     }
                 }
-            }
 
-            // Wait before next iteration
-            await new Promise(resolve => setTimeout(resolve, 100));
+                // Wait before next iteration
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        })();
+    }
+
+    stopQueueProcessor() {
+        this.processingQueue = false;
+
+        // Clear all retry timers
+        for (const timer of this.retryTimers) {
+            clearTimeout(timer);
         }
+        this.retryTimers.clear();
+    }
+
+    async close() {
+        this.stopQueueProcessor();
+
+        // Wait for processor to complete
+        if (this._processorPromise) {
+            await this._processorPromise;
+        }
+
+        await this.checkops.close();
     }
 
     // Advanced analytics with custom metrics
@@ -335,8 +365,15 @@ class AdvancedCheckOpsService extends EventEmitter {
     }
 
     async activateForm(formId) {
-        // Custom activation logic
-        this.emit('formActivated', { formId, timestamp: new Date() });
+        try {
+            // Call the actual CheckOps API to activate the form
+            await this.checkops.activateForm(formId);
+            this.emit('formActivated', { formId, timestamp: new Date() });
+        } catch (error) {
+            // If activateForm doesn't exist in the API, this is a stub for custom logic
+            console.warn('Form activation API not available, using custom activation logic');
+            this.emit('formActivated', { formId, timestamp: new Date() });
+        }
     }
 
     async close() {
