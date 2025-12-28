@@ -71,7 +71,18 @@ export function createFormEndpoint() {
 export function createSubmissionEndpoint() {
     return async (req, res) => {
         try {
-            const submission = await req.checkops.createSubmission(req.body);
+            const { formId } = req.params;
+            if (!formId) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Form ID is required',
+                });
+            }
+
+            const submission = await req.checkops.createSubmission({
+                formId,
+                submissionData: req.body,
+            });
             res.status(201).json({
                 success: true,
                 data: submission,

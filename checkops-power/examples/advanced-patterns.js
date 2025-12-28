@@ -375,11 +375,6 @@ class AdvancedCheckOpsService extends EventEmitter {
             this.emit('formActivated', { formId, timestamp: new Date() });
         }
     }
-
-    async close() {
-        this.processingQueue = false;
-        await this.checkops.close();
-    }
 }
 
 /**
