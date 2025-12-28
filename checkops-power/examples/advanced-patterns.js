@@ -74,9 +74,10 @@ class AdvancedCheckOpsService extends EventEmitter {
     }
 
     // Queue-based submission processing
-    async queueSubmission(submissionData, priority = 'normal') {
+    async queueSubmission(formId, submissionData, priority = 'normal') {
         const queueItem = {
             id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            formId,
             submissionData,
             priority,
             timestamp: new Date(),
@@ -110,7 +111,7 @@ class AdvancedCheckOpsService extends EventEmitter {
                     this.inFlightOperations++;
 
                     try {
-                        const submission = await this.checkops.createSubmission(item.submissionData);
+                        const submission = await this.checkops.createSubmission(item.formId, item.submissionData);
                         this.emit('queueItemProcessed', { item, submission });
                     } catch (error) {
                         item.retries++;
@@ -430,25 +431,27 @@ async function advancedPatternsExample() {
 
         // Example 2: Queue-based submission processing
         console.log('\n📦 Queuing submissions...');
-        await service.queueSubmission({
-            formId: advancedForm.id,
-            submissionData: {
+        await service.queueSubmission(
+            advancedForm.id,
+            {
                 'Name': 'Alice Johnson',
                 'Email': 'alice@example.com',
                 'Satisfaction': 5,
                 'Comments': 'Excellent service!',
             },
-        }, 'high');
+            'high'
+        );
 
-        await service.queueSubmission({
-            formId: advancedForm.id,
-            submissionData: {
+        await service.queueSubmission(
+            advancedForm.id,
+            {
                 'Name': 'Bob Smith',
                 'Email': 'bob@example.com',
                 'Satisfaction': 4,
                 'Comments': 'Good overall experience.',
             },
-        }, 'normal');
+            'normal'
+        );
 
         // Wait for queue processing
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -516,15 +519,15 @@ async function advancedPatternsExample() {
         console.log('\n📊 Generating advanced analytics...');
 
         // Add some test submissions first
-        await service.queueSubmission({
-            formId: advancedForm.id,
-            submissionData: {
+        await service.queueSubmission(
+            advancedForm.id,
+            {
                 'Name': 'Charlie Brown',
                 'Email': 'charlie@example.com',
                 'Satisfaction': 3,
                 'Comments': 'Average experience.',
-            },
-        });
+            }
+        );
 
         // Wait for processing
         await new Promise(resolve => setTimeout(resolve, 1000));
