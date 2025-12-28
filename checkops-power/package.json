@@ -28,7 +28,7 @@
     "license": "Apache-2.0",
     "dependencies": {
         "@modelcontextprotocol/sdk": "^0.5.0",
-        "@saiqa-tech/checkops": "^2.0.0",
+        "@saiqa-tech/checkops": "^2.1.0",
         "pg": "^8.11.0"
     },
     "peerDependencies": {

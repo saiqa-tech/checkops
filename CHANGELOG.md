@@ -5,6 +5,99 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-01-28
+
+### Added
+- **Kiro Power Integration** - Complete Kiro Power package for seamless CheckOps integration
+  - Interactive setup script with database configuration
+  - Automated dependency installation (`@saiqa-tech/checkops`, `pg`)
+  - Environment file generation with PostgreSQL settings
+  - Database migration automation
+  - Sample code generation for quick start
+- **Enhanced Wrapper Library** - Production-ready wrapper with advanced features
+  - `CheckOpsWrapper` class with retry logic, caching, and metrics
+  - Event-driven architecture with operation tracking
+  - Automatic reconnection and error handling
+  - Built-in health checks and performance monitoring
+- **Express.js Integration** - Complete middleware and routing solution
+  - Pre-built Express middleware for CheckOps integration
+  - RESTful API endpoints for forms, submissions, and statistics
+  - Error handling middleware with proper HTTP status codes
+  - Rate limiting and security middleware integration
+- **Comprehensive Examples** - Real-world usage patterns
+  - Basic usage examples with form creation and submissions
+  - Advanced patterns with caching, bulk operations, and analytics
+  - Express.js integration with complete server setup
+  - Production deployment examples with Docker and Kubernetes
+- **Steering Guides** - Detailed workflow documentation
+  - Getting started guide for new users
+  - Form creation best practices
+  - Question management workflows
+  - Error handling patterns
+  - Production deployment guide with security and performance optimization
+
+### Enhanced
+- **Documentation Coverage** - Comprehensive JSDoc comments (80%+ coverage)
+  - Detailed parameter documentation with types
+  - Return value specifications
+  - Error condition documentation
+  - Event emission documentation
+- **Security Improvements** - Production-ready security features
+  - SSL/TLS configuration examples
+  - Input validation and sanitization
+  - SQL injection prevention
+  - XSS protection
+  - Rate limiting implementation
+- **Performance Optimization** - Production-grade performance features
+  - Connection pooling configuration
+  - Caching strategies with Redis integration
+  - Database query optimization
+  - Memory leak prevention
+  - Metrics collection and monitoring
+
+### Fixed
+- **Code Quality** - Resolved all critical issues identified in code review
+  - Fixed memory leaks in wrapper cleanup
+  - Resolved async/await syntax errors
+  - Fixed switch case scope issues
+  - Cleaned up orphaned code
+  - Removed unused imports
+- **Security Vulnerabilities** - Addressed security concerns
+  - Fixed CSV injection vulnerabilities in utilities
+  - Corrected SSL configuration examples
+  - Enhanced input validation
+  - Improved error handling
+
+### Developer Experience
+- **MCP Server** - Model Context Protocol server for Kiro integration
+  - Database connection testing
+  - Form and question management tools
+  - Submission handling and analytics
+  - Health monitoring capabilities
+- **Package Scripts** - Convenient npm scripts for common tasks
+  - `npm run setup` - Interactive setup wizard
+  - `npm run example:basic` - Run basic usage examples
+  - `npm run example:express` - Start Express integration demo
+  - `npm run example:advanced` - Run advanced pattern examples
+
+### Deployment
+- **Docker Support** - Complete containerization setup
+  - Multi-stage Dockerfile for production
+  - Docker Compose configuration
+  - Health checks and monitoring
+  - Security best practices
+- **Kubernetes Support** - Cloud-native deployment
+  - Deployment manifests
+  - Service configuration
+  - ConfigMap and Secret management
+  - Horizontal Pod Autoscaling
+
+### Notes
+- Fully backward compatible with v2.0.0
+- Enhanced wrapper library provides additional features while maintaining core API
+- Kiro Power enables zero-configuration setup for new projects
+- Production deployment guides ensure secure and scalable deployments
+
 ## [2.0.0] - 2025-01-16
 
 ### Added

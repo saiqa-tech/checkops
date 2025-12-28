@@ -158,7 +158,7 @@ Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 - GitHub Issues: [https://github.com/saiqa-tech/checkops/issues](https://github.com/saiqa-tech/checkops/issues)
 - Documentation: [https://github.com/saiqa-tech/checkops](https://github.com/saiqa-tech/checkops)
 
-## Recent Updates (v2.0.0)
+## Recent Updates (v2.1.0)
 
 ### Option Key-Value System
 CheckOps now includes a stable option key-value system that ensures data integrity when option labels change:
