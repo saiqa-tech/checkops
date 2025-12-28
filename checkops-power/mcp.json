@@ -1,0 +1,25 @@
+{
+    "mcpServers": {
+        "checkops-tools": {
+            "command": "node",
+            "args": [
+                "./checkops-mcp-server.js"
+            ],
+            "env": {
+                "NODE_ENV": "development",
+                "DB_HOST": "${DB_HOST:-localhost}",
+                "DB_PORT": "${DB_PORT:-5432}",
+                "DB_NAME": "${DB_NAME}",
+                "DB_USER": "${DB_USER}",
+                "DB_PASSWORD": "${DB_PASSWORD}"
+            },
+            "disabled": false,
+            "autoApprove": [
+                "checkops_test_connection",
+                "checkops_get_forms",
+                "checkops_get_questions",
+                "checkops_get_submissions"
+            ]
+        }
+    }
+}

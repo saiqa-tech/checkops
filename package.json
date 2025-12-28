@@ -1,6 +1,6 @@
 {
   "name": "@saiqa-tech/checkops",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A production-ready Node.js npm package that enables developers to create dynamic forms with centralized question reusability, stable option key-value system, and structured data submission capabilities",
   "main": "src/index.js",
   "type": "module",

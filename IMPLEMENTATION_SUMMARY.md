@@ -1,7 +1,7 @@
 # CheckOps Option Key-Value System - Implementation Summary
 
 ## Overview
-Successfully implemented the complete Option Key-Value System (CHE-18) for CheckOps v2.0.0. This feature provides stable data integrity for option-based questions by using immutable keys while allowing labels to change freely.
+Successfully implemented the complete Option Key-Value System (CHE-18) for CheckOps v2.1.0. This feature provides stable data integrity for option-based questions by using immutable keys while allowing labels to change freely.
 
 ## Implementation Status: ✅ COMPLETE
 
@@ -107,9 +107,9 @@ The existing Question model already properly handles structured options as JSONB
 ## Phase 6: Documentation ✅
 
 ### Files Modified:
-- `README.md` - Updated with v2.0.0 features
-- `CHANGELOG.md` - Complete v2.0.0 changelog with migration guide
-- `package.json` - Version bumped to 2.0.0
+- `README.md` - Updated with v2.1.0 features
+- `CHANGELOG.md` - Complete v2.1.0 changelog with migration guide
+- `package.json` - Version bumped to 2.1.0
 
 ### Files Created:
 - `examples/option-key-value-demo.js` - Comprehensive demo script
@@ -174,7 +174,7 @@ async getOptionHistory(questionId, optionKey = null)
 ```
 
 ### Package Updates:
-- Version: 1.0.0 → 2.0.0
+- Version: 1.0.0 → 2.1.0
 - Description updated to mention stable option keys
 
 ---
@@ -307,7 +307,7 @@ npm run migrate
 
 ### Documentation Files (3):
 1. `README.md` - Updated features
-2. `CHANGELOG.md` - v2.0.0 changelog
+2. `CHANGELOG.md` - v2.1.0 changelog
 3. `IMPLEMENTATION_SUMMARY.md` - This file
 
 ---
@@ -352,7 +352,7 @@ The Option Key-Value System has been fully implemented and tested. All 8 phases 
 
 **Status:** ✅ READY FOR PRODUCTION
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 
 **Test Coverage:** 127/130 tests passing (3 skipped due to no database)
 

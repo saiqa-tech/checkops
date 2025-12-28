@@ -1,0 +1,77 @@
+# CodeRabbit AI Review Configuration
+# https://docs.coderabbit.ai/reference/configuration
+
+# Language for reviews
+language: en-US
+
+# Path filters - exclude files from review
+path_filters: 
+  - "**/*.js"
+  - "**/*.json"
+  - "**/*.md"
+  - "**/*.sql"
+  - "**/*.yaml"
+  - "**/*.yml"
+  - "!node_modules/**"
+  - "!package-lock.json"
+  - "!*.log"
+  - "!coverage/**"
+  - "!dist/**"
+  - "!build/**"
+
+# Enable early access features
+early_access: true
+
+# Reviews configuration
+reviews:
+  # Auto-review settings
+  auto_review:
+    enabled: true
+    drafts: false  # Ignore draft PRs
+  
+  # High-level summary
+  high_level_summary: false
+  
+  # Path-specific instructions
+  path_instructions:
+    - path: "**/*.js"
+      instructions: |
+        Focus on:
+        - SQL injection prevention in database queries
+        - Proper error handling and logging
+        - Input validation and sanitization
+        - Security best practices for MCP server implementation
+        - Performance optimization
+    
+    - path: "**/*.sql"
+      instructions: |
+        Ensure:
+        - Migrations are safe and reversible
+        - No SQL injection vulnerabilities
+        - Proper indexing considerations
+        - Data integrity constraints
+    
+    - path: "**/src/**/*.js"
+      instructions: |
+        Review for:
+        - Proper async/await usage
+        - Error boundary implementation
+        - Memory leak prevention
+        - Security vulnerabilities
+  
+  # Tools configuration
+  tools:
+    eslint:
+      enabled: true
+
+# Knowledge base configuration
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      - "docs/**/*.md"
+      - "README.md"
+      - "CONTRIBUTING.md"
+
+# Chat configuration
+chat:
+  auto_reply: false
