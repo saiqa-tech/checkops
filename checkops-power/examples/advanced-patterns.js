@@ -345,6 +345,13 @@ class AdvancedCheckOpsService extends EventEmitter {
     }
 }
 
+/**
+ * Runs an end-to-end demonstration of AdvancedCheckOpsService features and workflows.
+ *
+ * Initializes the service, creates a validated form, enqueues and processes submissions with prioritization and retries,
+ * creates an A/B test and demonstrates deterministic routing, generates advanced analytics (optionally segmented),
+ * logs progress and events to the console, and performs a clean shutdown.
+ */
 async function advancedPatternsExample() {
     console.log('🚀 CheckOps Advanced Patterns Example');
     console.log('=====================================\n');

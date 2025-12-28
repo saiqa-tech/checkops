@@ -11,6 +11,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+/**
+ * Create and configure an Express application with security, rate limiting,
+ * body parsing, CheckOps routes, and several example API endpoints.
+ *
+ * The returned app includes middleware for Helmet, CORS, and request limiting,
+ * mounts the CheckOps router at `/api/checkops`, and exposes example endpoints
+ * for form templates, bulk submissions, CSV export, and analytics. It also
+ * installs global error and 404 handlers.
+ *
+ * @returns {{ app: import('express').Application, port: number|string }} An object containing the configured Express `app` and the selected `port`.
+ */
 async function createExpressApp() {
     const app = express();
     const port = process.env.PORT || 3000;
@@ -206,6 +217,10 @@ async function createExpressApp() {
     return { app, port };
 }
 
+/**
+ * Starts the Express application, begins listening on the configured port, and installs graceful shutdown handlers for SIGINT and SIGTERM.
+ * @returns {import('http').Server} The running HTTP server instance listening on the configured port.
+ */
 async function startServer() {
     try {
         const { app, port } = await createExpressApp();
