@@ -7,6 +7,9 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+/**
+ * Demonstrates common CheckOpsWrapper workflows: creating forms (using FormBuilder and templates), creating submissions, retrieving data with optional caching, performing bulk submissions, running a health check, collecting metrics, and handling lifecycle events and cleanup.
+ */
 async function basicUsageExample() {
     console.log('🚀 CheckOps Wrapper - Basic Usage Example');
     console.log('==========================================\n');
