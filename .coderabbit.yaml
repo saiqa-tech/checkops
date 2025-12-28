@@ -1,0 +1,80 @@
+# CodeRabbit AI Review Configuration
+# https://docs.coderabbit.ai/guides/review-guide
+
+# Language settings
+language: en-US
+
+# Review settings
+reviews:
+  # Enable auto-reviews on pull requests
+  auto_review: true
+  
+  # Review depth - how thorough the review should be
+  # Options: quick, standard, thorough
+  review_level: standard
+  
+  # Enable security-focused reviews
+  security_review: true
+  
+  # Enable performance analysis
+  performance_review: true
+
+# File patterns to include/exclude
+rules:
+  # Include these file types for review
+  include:
+    - "**/*.js"
+    - "**/*.json"
+    - "**/*.md"
+    - "**/*.sql"
+    - "**/*.yaml"
+    - "**/*.yml"
+  
+  # Exclude these patterns from review
+  exclude:
+    - "node_modules/**"
+    - "package-lock.json"
+    - "*.log"
+    - ".git/**"
+    - "coverage/**"
+    - "dist/**"
+    - "build/**"
+
+# Focus areas for this project
+focus_areas:
+  - security
+  - performance
+  - maintainability
+  - documentation
+  - error_handling
+  - testing
+
+# Custom review guidelines
+guidelines:
+  - "Pay special attention to SQL injection prevention in database queries"
+  - "Ensure proper error handling and logging throughout the codebase"
+  - "Verify that sensitive data is not exposed in logs or responses"
+  - "Check for proper input validation and sanitization"
+  - "Review MCP server implementation for security best practices"
+  - "Ensure database migrations are safe and reversible"
+
+# Notification settings
+notifications:
+  # Post review comments on PR
+  pr_comments: true
+  
+  # Create review summary
+  summary: true
+  
+  # Mention specific team members for critical issues
+  mention_on_critical: false
+
+# Integration settings
+integrations:
+  # GitHub integration
+  github:
+    # Auto-approve minor changes (like formatting)
+    auto_approve_minor: false
+    
+    # Request changes for critical issues
+    request_changes_on_critical: true
