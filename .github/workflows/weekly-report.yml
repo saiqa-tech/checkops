@@ -1,0 +1,167 @@
+name: Weekly Coverage Dashboard
+
+on:
+  schedule:
+    # Run every Friday at 5 PM UTC
+    - cron: '0 17 * * 5'
+  workflow_dispatch:
+
+jobs:
+  coverage-report:
+    name: Generate Weekly Coverage Report
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: checkops
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run migrations
+        run: npm run migrate
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: checkops
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_SSL: false
+      
+      - name: Run all tests with coverage
+        run: npm run test:all
+        env:
+          CI: true
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: checkops
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_SSL: false
+      
+      - name: Generate coverage summary
+        id: coverage
+        run: |
+          COVERAGE=$(cat coverage/coverage-summary.json | jq -r '.total')
+          LINES=$(echo $COVERAGE | jq -r '.lines.pct')
+          BRANCHES=$(echo $COVERAGE | jq -r '.branches.pct')
+          FUNCTIONS=$(echo $COVERAGE | jq -r '.functions.pct')
+          STATEMENTS=$(echo $COVERAGE | jq -r '.statements.pct')
+          
+          echo "lines=$LINES" >> $GITHUB_OUTPUT
+          echo "branches=$BRANCHES" >> $GITHUB_OUTPUT
+          echo "functions=$FUNCTIONS" >> $GITHUB_OUTPUT
+          echo "statements=$STATEMENTS" >> $GITHUB_OUTPUT
+      
+      - name: Count tests
+        id: tests
+        run: |
+          TOTAL_TESTS=$(npm test 2>&1 | grep -oP '\d+(?= passed)' | tail -1 || echo "0")
+          echo "total=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+      
+      - name: Create weekly report
+        run: |
+          cat << EOF > weekly-report.md
+          # Weekly Coverage Report - $(date +%Y-%m-%d)
+          
+          ## Coverage Metrics
+          
+          | Metric | Coverage | Target | Status |
+          |--------|----------|--------|--------|
+          | Lines | ${{ steps.coverage.outputs.lines }}% | 80% | $([ $(echo "${{ steps.coverage.outputs.lines }} >= 80" | bc -l) -eq 1 ] && echo "✅" || echo "⚠️") |
+          | Branches | ${{ steps.coverage.outputs.branches }}% | 80% | $([ $(echo "${{ steps.coverage.outputs.branches }} >= 80" | bc -l) -eq 1 ] && echo "✅" || echo "⚠️") |
+          | Functions | ${{ steps.coverage.outputs.functions }}% | 80% | $([ $(echo "${{ steps.coverage.outputs.functions }} >= 80" | bc -l) -eq 1 ] && echo "✅" || echo "⚠️") |
+          | Statements | ${{ steps.coverage.outputs.statements }}% | 80% | $([ $(echo "${{ steps.coverage.outputs.statements }} >= 80" | bc -l) -eq 1 ] && echo "✅" || echo "⚠️") |
+          
+          ## Test Summary
+          
+          - **Total Tests:** ${{ steps.tests.outputs.total }}
+          - **Test Suites:** Unit, Integration, E2E
+          
+          ## Coverage Trend
+          
+          Track progress toward 80% coverage goal from baseline of 27%.
+          
+          ## Critical Path Coverage
+          
+          Critical files requiring 100% coverage:
+          - \`src/utils/optionUtils.js\` - Option key generation and transformation
+          
+          ## Action Items
+          
+          - [ ] Review coverage gaps
+          - [ ] Address any failing tests
+          - [ ] Update test documentation if needed
+          
+          ---
+          *Generated automatically every Friday*
+          EOF
+          
+          cat weekly-report.md
+      
+      - name: Post to Slack (if configured)
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "📊 Weekly Coverage Report",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Weekly Coverage Report - '"$(date +%Y-%m-%d)"'"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {"type": "mrkdwn", "text": "*Lines:* ${{ steps.coverage.outputs.lines }}%"},
+                    {"type": "mrkdwn", "text": "*Branches:* ${{ steps.coverage.outputs.branches }}%"},
+                    {"type": "mrkdwn", "text": "*Functions:* ${{ steps.coverage.outputs.functions }}%"},
+                    {"type": "mrkdwn", "text": "*Statements:* ${{ steps.coverage.outputs.statements }}%"}
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Total Tests: ${{ steps.tests.outputs.total }}"
+                  }
+                }
+              ]
+            }'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-coverage-report
+          path: |
+            weekly-report.md
+            coverage/

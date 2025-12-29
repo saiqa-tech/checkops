@@ -1,4 +1,4 @@
-import CheckOps from '@saiqa-tech/checkops';
+import CheckOps from '../../src/index.js';
 import EventEmitter from 'events';
 
 /**

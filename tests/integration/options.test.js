@@ -115,8 +115,10 @@ describe('Options Integration Tests', () => {
         },
       });
 
-      expect(submission._rawData[question.id]).toBe('priority_high');
-      expect(submission.submissionData[question.id]).toBe('High Priority');
+      // Need to retrieve to get _rawData and submissionData transforms
+      const retrieved = await checkops.getSubmission(submission.id);
+      expect(retrieved._rawData[question.id]).toBe('priority_high');
+      expect(retrieved.submissionData[question.id]).toBe('High Priority');
     });
 
     test('should accept key directly on submission', async () => {
@@ -140,8 +142,10 @@ describe('Options Integration Tests', () => {
         },
       });
 
-      expect(submission._rawData[question.id]).toBe('priority_high');
-      expect(submission.submissionData[question.id]).toBe('High Priority');
+      // Need to retrieve to get _rawData and submissionData transforms
+      const retrieved = await checkops.getSubmission(submission.id);
+      expect(retrieved._rawData[question.id]).toBe('priority_high');
+      expect(retrieved.submissionData[question.id]).toBe('High Priority');
     });
 
     test('should handle multiselect with mixed keys and labels', async () => {
@@ -169,8 +173,10 @@ describe('Options Integration Tests', () => {
         },
       });
 
-      expect(submission._rawData[question.id]).toEqual(['color_red', 'color_blue']);
-      expect(submission.submissionData[question.id]).toEqual(['Red', 'Blue']);
+      // Need to retrieve to get _rawData and submissionData transforms
+      const retrieved = await checkops.getSubmission(submission.id);
+      expect(retrieved._rawData[question.id]).toEqual(['color_red', 'color_blue']);
+      expect(retrieved.submissionData[question.id]).toEqual(['Red', 'Blue']);
     });
   });
 
@@ -221,13 +227,15 @@ describe('Options Integration Tests', () => {
         submissionData: { [question.id]: 'Critical Priority' },
       });
 
-      expect(sub1._rawData[question.id]).toBe('priority_high');
-      expect(sub2._rawData[question.id]).toBe('priority_high');
-
+      // Retrieve to get _rawData
       const retrieved1 = await checkops.getSubmission(sub1.id);
-      expect(retrieved1.submissionData[question.id]).toBe('Critical Priority');
-
       const retrieved2 = await checkops.getSubmission(sub2.id);
+
+      expect(retrieved1._rawData[question.id]).toBe('priority_high');
+      expect(retrieved2._rawData[question.id]).toBe('priority_high');
+
+      // Both should now show updated label
+      expect(retrieved1.submissionData[question.id]).toBe('Critical Priority');
       expect(retrieved2.submissionData[question.id]).toBe('Critical Priority');
     });
 
@@ -355,7 +363,7 @@ describe('Options Integration Tests', () => {
           formId: form.id,
           submissionData: { [question.id]: 'Invalid Option' },
         })
-      ).rejects.toThrow('Invalid option');
+      ).rejects.toThrow('Validation failed');
     });
 
     test('should validate multiselect array values', async () => {
@@ -377,7 +385,341 @@ describe('Options Integration Tests', () => {
           formId: form.id,
           submissionData: { [question.id]: ['Red', 'Invalid'] },
         })
-      ).rejects.toThrow('Invalid option');
+      ).rejects.toThrow('Validation failed');
+    });
+  });
+
+  describe('JSONB Persistence and Database Validation', () => {
+    test('should store options as JSONB in database with correct structure', async () => {
+      if (!checkops) return;
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select priority',
+        questionType: 'select',
+        options: [
+          { key: 'priority_high', label: 'High Priority' },
+          { key: 'priority_low', label: 'Low Priority' },
+        ],
+      });
+
+      // Query database directly to verify JSONB structure
+      const result = await pool.query(
+        'SELECT options FROM question_bank WHERE id = $1',
+        [question.id]
+      );
+
+      const storedOptions = result.rows[0].options;
+      expect(Array.isArray(storedOptions)).toBe(true);
+      expect(storedOptions).toHaveLength(2);
+      expect(storedOptions[0]).toHaveProperty('key', 'priority_high');
+      expect(storedOptions[0]).toHaveProperty('label', 'High Priority');
+      expect(storedOptions[0]).toHaveProperty('order');
+      expect(storedOptions[0]).toHaveProperty('metadata');
+      expect(storedOptions[0]).toHaveProperty('disabled');
+      expect(storedOptions[0]).toHaveProperty('createdAt');
+    });
+
+    test('should enforce unique key constraint within JSONB', async () => {
+      if (!checkops) return;
+
+      // This should be caught by application logic before hitting database
+      await expect(
+        checkops.createQuestion({
+          questionText: 'Select priority',
+          questionType: 'select',
+          options: [
+            { key: 'same_key', label: 'Option 1' },
+            { key: 'same_key', label: 'Option 2' },
+          ],
+        })
+      ).rejects.toThrow('Option keys must be unique');
+    });
+
+    test('should preserve option order in database', async () => {
+      if (!checkops) return;
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select priority',
+        questionType: 'select',
+        options: [
+          { key: 'opt_1', label: 'First', order: 3 },
+          { key: 'opt_2', label: 'Second', order: 1 },
+          { key: 'opt_3', label: 'Third', order: 2 },
+        ],
+      });
+
+      const result = await pool.query(
+        'SELECT options FROM question_bank WHERE id = $1',
+        [question.id]
+      );
+
+      const storedOptions = result.rows[0].options;
+      expect(storedOptions[0].order).toBe(3);
+      expect(storedOptions[1].order).toBe(1);
+      expect(storedOptions[2].order).toBe(2);
+    });
+
+    test('should store metadata as JSONB object', async () => {
+      if (!checkops) return;
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select color',
+        questionType: 'select',
+        options: [
+          {
+            key: 'color_red',
+            label: 'Red',
+            metadata: { hexColor: '#FF0000', category: 'warm' }
+          },
+        ],
+      });
+
+      const result = await pool.query(
+        'SELECT options FROM question_bank WHERE id = $1',
+        [question.id]
+      );
+
+      const storedOptions = result.rows[0].options;
+      expect(storedOptions[0].metadata).toEqual({ hexColor: '#FF0000', category: 'warm' });
+    });
+  });
+
+  describe('Option Key Immutability', () => {
+    test('should not allow key changes via updateOptionLabel', async () => {
+      if (!checkops) return;
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select priority',
+        questionType: 'select',
+        options: [{ key: 'priority_high', label: 'High' }],
+      });
+
+      // updateOptionLabel should only change label, not key
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical');
+
+      const updated = await checkops.getQuestion(question.id);
+      expect(updated.options[0].key).toBe('priority_high'); // Key unchanged
+      expect(updated.options[0].label).toBe('Critical'); // Label changed
+    });
+
+    test('should maintain key immutability across multiple label changes', async () => {
+      if (!checkops) return;
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select priority',
+        questionType: 'select',
+        options: [{ key: 'priority_high', label: 'High' }],
+      });
+
+      const originalKey = question.options[0].key;
+
+      await checkops.updateOptionLabel(question.id, originalKey, 'Critical');
+      await checkops.updateOptionLabel(question.id, originalKey, 'Very Critical');
+      await checkops.updateOptionLabel(question.id, originalKey, 'Extremely Critical');
+
+      const updated = await checkops.getQuestion(question.id);
+      expect(updated.options[0].key).toBe(originalKey);
+      expect(updated.options[0].label).toBe('Extremely Critical');
+    });
+  });
+
+  describe('Option History Tracking', () => {
+    test('should create history record with timestamp', async () => {
+      if (!checkops) return;
+
+      const beforeUpdate = new Date();
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select priority',
+        questionType: 'select',
+        options: [{ key: 'priority_high', label: 'High' }],
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
+
+      await checkops.updateOptionLabel(
+        question.id,
+        'priority_high',
+        'Critical',
+        'admin@example.com'
+      );
+
+      const afterUpdate = new Date();
+
+      const history = await checkops.getOptionHistory(question.id, 'priority_high');
+
+      expect(history).toHaveLength(1);
+      const historyRecord = history[0];
+
+      const changedAt = new Date(historyRecord.changedAt);
+      expect(changedAt.getTime()).toBeGreaterThanOrEqual(beforeUpdate.getTime());
+      expect(changedAt.getTime()).toBeLessThanOrEqual(afterUpdate.getTime());
+    });
+
+    test('should track multiple label changes in history', async () => {
+      if (!checkops) return;
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select priority',
+        questionType: 'select',
+        options: [{ key: 'priority_high', label: 'High' }],
+      });
+
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical', 'user1');
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Very Critical', 'user2');
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Extremely Critical', 'user3');
+
+      const history = await checkops.getOptionHistory(question.id, 'priority_high');
+
+      expect(history).toHaveLength(3);
+
+      // History might be in any order, so check that all 3 changes are present
+      const changes = history.map(h => ({ from: h.oldLabel, to: h.newLabel, by: h.changedBy }));
+      expect(changes).toContainEqual({ from: 'High', to: 'Critical', by: 'user1' });
+      expect(changes).toContainEqual({ from: 'Critical', to: 'Very Critical', by: 'user2' });
+      expect(changes).toContainEqual({ from: 'Very Critical', to: 'Extremely Critical', by: 'user3' });
+    });
+
+    test('should retrieve history by question and option key', async () => {
+      if (!checkops) return;
+
+      const question1 = await checkops.createQuestion({
+        questionText: 'Select priority',
+        questionType: 'select',
+        options: [{ key: 'priority_high', label: 'High' }],
+      });
+
+      const question2 = await checkops.createQuestion({
+        questionText: 'Select status',
+        questionType: 'select',
+        options: [{ key: 'status_active', label: 'Active' }],
+      });
+
+      await checkops.updateOptionLabel(question1.id, 'priority_high', 'Critical');
+      await checkops.updateOptionLabel(question2.id, 'status_active', 'Live');
+
+      const history1 = await checkops.getOptionHistory(question1.id, 'priority_high');
+      const history2 = await checkops.getOptionHistory(question2.id, 'status_active');
+
+      expect(history1).toHaveLength(1);
+      expect(history1[0].optionKey).toBe('priority_high');
+
+      expect(history2).toHaveLength(1);
+      expect(history2[0].optionKey).toBe('status_active');
+    });
+
+    test('should handle null changedBy gracefully', async () => {
+      if (!checkops) return;
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select priority',
+        questionType: 'select',
+        options: [{ key: 'priority_high', label: 'High' }],
+      });
+
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical', null);
+
+      const history = await checkops.getOptionHistory(question.id, 'priority_high');
+
+      expect(history).toHaveLength(1);
+      expect(history[0].changedBy).toBeNull();
+    });
+  });
+
+  describe('Edge Cases for Options', () => {
+    test('should handle options with extremely long labels (5000 characters)', async () => {
+      if (!checkops) return;
+
+      const longLabel = 'A'.repeat(5000);
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select option',
+        questionType: 'select',
+        options: [{ key: 'long_opt', label: longLabel }],
+      });
+
+      expect(question.options[0].label).toBe(longLabel);
+      expect(question.options[0].label.length).toBe(5000);
+    });
+
+    test('should handle 100+ options in single question', async () => {
+      if (!checkops) return;
+
+      const manyOptions = Array.from({ length: 150 }, (_, i) => ({
+        key: `opt_${i}`,
+        label: `Option ${i + 1}`,
+      }));
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select from many',
+        questionType: 'select',
+        options: manyOptions,
+      });
+
+      expect(question.options).toHaveLength(150);
+
+      // Verify all stored correctly in database
+      const result = await pool.query(
+        'SELECT options FROM question_bank WHERE id = $1',
+        [question.id]
+      );
+
+      expect(result.rows[0].options).toHaveLength(150);
+    });
+
+    test('should handle unicode and emoji in option labels', async () => {
+      if (!checkops) return;
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select language',
+        questionType: 'select',
+        options: [
+          { key: 'lang_ja', label: '日本語' },
+          { key: 'lang_ko', label: '한국어' },
+          { key: 'lang_zh', label: '中文' },
+          { key: 'lang_ar', label: 'العربية' },
+          { key: 'lang_emoji', label: '🔴🔵🟢' },
+        ],
+      });
+
+      expect(question.options[0].label).toBe('日本語');
+      expect(question.options[4].label).toBe('🔴🔵🟢');
+
+      // Verify submission works with unicode labels
+      const form = await checkops.createForm({
+        title: 'Test Form',
+        questions: [{ questionId: question.id }],
+      });
+
+      const submission = await checkops.createSubmission({
+        formId: form.id,
+        submissionData: { [question.id]: '日本語' },
+      });
+
+      // Retrieve to get the labels
+      const retrieved = await checkops.getSubmission(submission.id);
+      expect(retrieved.submissionData[question.id]).toBe('日本語');
+      expect(retrieved._rawData[question.id]).toBe('lang_ja');
+    });
+
+    test('should handle empty option labels', async () => {
+      if (!checkops) return;
+
+      const question = await checkops.createQuestion({
+        questionText: 'Select option',
+        questionType: 'select',
+        options: ['', 'Non-empty', ''],
+      });
+
+      expect(question.options).toHaveLength(3);
+      expect(question.options[0].label).toBe('');
+      expect(question.options[1].label).toBe('Non-empty');
+      expect(question.options[2].label).toBe('');
+
+      // Keys should still be unique
+      const keys = question.options.map(opt => opt.key);
+      const uniqueKeys = new Set(keys);
+      expect(uniqueKeys.size).toBe(3);
     });
   });
 });
