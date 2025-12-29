@@ -87,6 +87,65 @@ describe('OptionUtils', () => {
       const slug = key.replace(/^opt_/, '').replace(/_[a-f0-9]{6}$/, '');
       expect(slug.length).toBeLessThanOrEqual(30);
     });
+
+    test('should generate deterministic keys (same input always produces same key)', () => {
+      const key1 = OptionUtils.generateOptionKey('Red', 0, 'Q-001');
+      const key2 = OptionUtils.generateOptionKey('Red', 0, 'Q-001');
+      const key3 = OptionUtils.generateOptionKey('Red', 0, 'Q-001');
+
+      expect(key1).toBe(key2);
+      expect(key2).toBe(key3);
+    });
+
+    test('should generate different keys for different labels', () => {
+      const key1 = OptionUtils.generateOptionKey('Red', 0, 'Q-001');
+      const key2 = OptionUtils.generateOptionKey('Blue', 0, 'Q-001');
+
+      expect(key1).not.toBe(key2);
+    });
+
+    test('should generate different keys for same label with different indices', () => {
+      const key1 = OptionUtils.generateOptionKey('Red', 0, 'Q-001');
+      const key2 = OptionUtils.generateOptionKey('Red', 1, 'Q-001');
+
+      expect(key1).not.toBe(key2);
+    });
+
+    test('should generate different keys for same label in different questions', () => {
+      const key1 = OptionUtils.generateOptionKey('Red', 0, 'Q-001');
+      const key2 = OptionUtils.generateOptionKey('Red', 0, 'Q-002');
+
+      expect(key1).not.toBe(key2);
+    });
+
+    test('should handle unicode characters', () => {
+      const key = OptionUtils.generateOptionKey('日本語', 0, 'Q-001');
+      // Unicode characters get stripped, leaving just the hash
+      expect(key).toMatch(/^opt__[a-f0-9]{6}$/);
+    });
+
+    test('should handle emoji in labels', () => {
+      const key = OptionUtils.generateOptionKey('🔴 Red Circle', 0, 'Q-001');
+      expect(key).toMatch(/^opt_red_circle_[a-f0-9]{6}$/);
+    });
+
+    test('should handle empty label', () => {
+      const key = OptionUtils.generateOptionKey('', 0, 'Q-001');
+      // Empty label results in just opt_ and hash
+      expect(key).toMatch(/^opt__[a-f0-9]{6}$/);
+    });
+
+    test('should produce URL-safe keys', () => {
+      const key = OptionUtils.generateOptionKey('Test & Special/Characters!', 0, 'Q-001');
+      expect(key).toMatch(/^[a-z0-9_]+$/);
+    });
+
+    test('should produce database-safe keys', () => {
+      const key = OptionUtils.generateOptionKey("SQL'; DROP TABLE--;", 0, 'Q-001');
+      expect(key).not.toContain("'");
+      expect(key).not.toContain(';');
+      expect(key).not.toContain(' ');
+    });
   });
 
   describe('sanitizeOptionKey', () => {
@@ -294,6 +353,157 @@ describe('OptionUtils', () => {
       expect(OptionUtils.isValidAnswer('', options, 'select')).toBe(true);
       expect(OptionUtils.isValidAnswer(null, options, 'select')).toBe(true);
       expect(OptionUtils.isValidAnswer(undefined, options, 'select')).toBe(true);
+    });
+  });
+
+  describe('Edge Cases and Performance', () => {
+    test('should handle 1000+ options in processOptions', () => {
+      const largeOptions = Array.from({ length: 1000 }, (_, i) => `Option ${i + 1}`);
+      const result = OptionUtils.processOptions(largeOptions, 'Q-001');
+
+      expect(result).toHaveLength(1000);
+      expect(result[0].label).toBe('Option 1');
+      expect(result[999].label).toBe('Option 1000');
+
+      // Verify all keys are unique
+      const keys = result.map(opt => opt.key);
+      const uniqueKeys = new Set(keys);
+      expect(uniqueKeys.size).toBe(1000);
+    });
+
+    test('should handle options with very long labels (5000 characters)', () => {
+      const longLabel = 'A'.repeat(5000);
+      const options = [longLabel, 'Short'];
+      const result = OptionUtils.processOptions(options, 'Q-001');
+
+      expect(result).toHaveLength(2);
+      expect(result[0].label).toBe(longLabel);
+      expect(result[0].label.length).toBe(5000);
+      // Key should still be manageable length
+      expect(result[0].key.length).toBeLessThan(50);
+    });
+
+    test('should handle case sensitivity correctly in findOption', () => {
+      const options = [
+        { key: 'color_red', label: 'Red' },
+        { key: 'color_RED', label: 'RED' },
+      ];
+
+      const result1 = OptionUtils.findOption(options, 'Red');
+      const result2 = OptionUtils.findOption(options, 'RED');
+      const result3 = OptionUtils.findOption(options, 'red');
+
+      expect(result1).toEqual(options[0]);
+      expect(result2).toEqual(options[1]);
+      expect(result3).toBeNull(); // lowercase not found
+    });
+
+    test('should handle special unicode characters in all functions', () => {
+      const unicodeOptions = ['日本語', '한국어', '中文', 'العربية', '🔴🔵🟢'];
+      const result = OptionUtils.processOptions(unicodeOptions, 'Q-001');
+
+      expect(result).toHaveLength(5);
+      expect(result[0].label).toBe('日本語');
+
+      // Keys should still be valid
+      result.forEach(opt => {
+        expect(opt.key).toMatch(/^opt_[a-z0-9_]{1,37}$/);
+      });
+    });
+
+    test('should handle convertToKeys with large arrays', () => {
+      const options = Array.from({ length: 100 }, (_, i) => ({
+        key: `opt_${i}`,
+        label: `Label ${i}`,
+      }));
+
+      const labels = Array.from({ length: 50 }, (_, i) => `Label ${i}`);
+      const result = OptionUtils.convertToKeys(labels, options);
+
+      expect(result).toHaveLength(50);
+      expect(result[0]).toBe('opt_0');
+      expect(result[49]).toBe('opt_49');
+    });
+
+    test('should handle mixed case in convertToKeys (case sensitive)', () => {
+      const options = [
+        { key: 'color_red', label: 'Red' },
+        { key: 'color_RED', label: 'RED' },
+      ];
+
+      expect(OptionUtils.convertToKeys('Red', options)).toBe('color_red');
+      expect(OptionUtils.convertToKeys('RED', options)).toBe('color_RED');
+      expect(OptionUtils.convertToKeys('red', options)).toBe('red'); // not found, returns original
+    });
+
+    test('should handle options with identical labels but different keys', () => {
+      const options = [
+        { key: 'opt_1', label: 'Same Label' },
+        { key: 'opt_2', label: 'Same Label' },
+      ];
+
+      const result = OptionUtils.processOptions(options, 'Q-001');
+      expect(result).toHaveLength(2);
+      expect(result[0].key).toBe('opt_1');
+      expect(result[1].key).toBe('opt_2');
+
+      // findOption should return first match
+      const found = OptionUtils.findOption(result, 'Same Label');
+      expect(found.key).toBe('opt_1');
+    });
+
+    test('should handle options with null/undefined metadata gracefully', () => {
+      const options = [
+        { key: 'opt_1', label: 'Option 1', metadata: null },
+        { key: 'opt_2', label: 'Option 2', metadata: undefined },
+      ];
+
+      const result = OptionUtils.processOptions(options, 'Q-001');
+      expect(result[0].metadata).toEqual({});
+      expect(result[1].metadata).toEqual({});
+    });
+
+    test('should handle processOptions with all empty string labels', () => {
+      const options = ['', '', ''];
+      const result = OptionUtils.processOptions(options, 'Q-001');
+
+      expect(result).toHaveLength(3);
+      // Each should have unique key despite same (empty) label
+      const keys = result.map(opt => opt.key);
+      const uniqueKeys = new Set(keys);
+      expect(uniqueKeys.size).toBe(3);
+    });
+
+    test('should handle sanitizeOptionKey with exactly 100 characters', () => {
+      const exactly100 = 'a'.repeat(100);
+      const result = OptionUtils.sanitizeOptionKey(exactly100);
+      expect(result).toBe(exactly100);
+    });
+
+    test('should handle sanitizeOptionKey with hyphens and underscores', () => {
+      expect(OptionUtils.sanitizeOptionKey('opt-key_123')).toBe('opt-key_123');
+      expect(OptionUtils.sanitizeOptionKey('opt_key-123')).toBe('opt_key-123');
+      expect(OptionUtils.sanitizeOptionKey('OPT_KEY_123')).toBe('OPT_KEY_123');
+    });
+
+    test('should reject sanitizeOptionKey with spaces', () => {
+      expect(() => {
+        OptionUtils.sanitizeOptionKey('opt key 123');
+      }).toThrow(ValidationError);
+      expect(() => {
+        OptionUtils.sanitizeOptionKey('opt key 123');
+      }).toThrow('alphanumeric characters, underscores, and hyphens');
+    });
+
+    test('should handle isValidAnswer with empty options array', () => {
+      const result = OptionUtils.isValidAnswer('Red', [], 'select');
+      expect(result).toBe(false);
+    });
+
+    test('should handle requiresOptions with undefined/null type', () => {
+      expect(OptionUtils.requiresOptions(undefined)).toBe(false);
+      expect(OptionUtils.requiresOptions(null)).toBe(false);
+      expect(OptionUtils.requiresOptions('')).toBe(false);
     });
   });
 });

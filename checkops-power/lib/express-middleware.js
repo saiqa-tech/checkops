@@ -257,19 +257,21 @@ export function checkOpsErrorHandler() {
         let errorType = 'INTERNAL_ERROR';
         let message = 'Internal server error';
 
-        if (error.message.includes('validation')) {
+        const errorMsg = error.message.toLowerCase();
+
+        if (errorMsg.includes('validation')) {
             statusCode = 400;
             errorType = 'VALIDATION_ERROR';
             message = error.message;
-        } else if (error.message.includes('not found')) {
+        } else if (errorMsg.includes('not found')) {
             statusCode = 404;
             errorType = 'NOT_FOUND_ERROR';
             message = 'Resource not found';
-        } else if (error.message.includes('duplicate')) {
+        } else if (errorMsg.includes('duplicate')) {
             statusCode = 409;
             errorType = 'DUPLICATE_ERROR';
             message = 'Resource already exists';
-        } else if (error.message.includes('connection')) {
+        } else if (errorMsg.includes('connection')) {
             statusCode = 503;
             errorType = 'CONNECTION_ERROR';
             message = 'Service temporarily unavailable';

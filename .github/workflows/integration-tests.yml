@@ -1,0 +1,76 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  integration-tests:
+    name: Integration Tests (Node ${{ matrix.node-version }}, PostgreSQL ${{ matrix.postgres-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    strategy:
+      matrix:
+        node-version: [20.x]
+        postgres-version: [14, 16]
+    
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres-version }}
+        env:
+          POSTGRES_DB: checkops
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run migrations
+        run: npm run migrate
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: checkops
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_SSL: false
+      
+      - name: Run integration tests
+        run: npm run test:integration -- --coverage
+        env:
+          CI: true
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: checkops
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_SSL: false
+      
+      - name: Upload coverage reports
+        if: matrix.postgres-version == '16'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage/coverage-final.json
+          flags: integration-tests
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
