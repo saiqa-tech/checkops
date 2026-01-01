@@ -21,7 +21,7 @@ export class ProductionMetricsCollector {
         this.monitoringInterval = null;
         this.metricsHistory = [];
         this.maxHistorySize = 1000; // Keep last 1000 data points
-        this.maxAlertsHistory = 100; // Prevent alert memory leaks
+        this.maxAlertsSize = 1000; // Prevent alert memory leaks
     }
 
     startMonitoring(intervalMs = 60000) { // Default: 1 minute
@@ -174,8 +174,8 @@ export class ProductionMetricsCollector {
             this.alerts.push(...alerts);
 
             // Prevent memory leaks by limiting alert history
-            if (this.alerts.length > this.maxAlertsHistory) {
-                this.alerts.splice(0, this.alerts.length - this.maxAlertsHistory);
+            if (this.alerts.length > this.maxAlertsSize) {
+                this.alerts.splice(0, this.alerts.length - this.maxAlertsSize);
             }
 
             this.emitAlerts(alerts);
@@ -293,7 +293,7 @@ export class ProductionMetricsCollector {
         };
 
         if (format === 'json') {
-            return JSON.stringify(report, null, 2);
+            return report;
         }
 
         // Simple text format

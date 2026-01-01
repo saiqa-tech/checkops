@@ -239,6 +239,7 @@ export class PerformanceMonitor {
 
     // Decorator for monitoring function performance
     monitor(operationName) {
+        const metrics = this.metrics; // Capture metrics reference in outer scope
         return (target, propertyKey, descriptor) => {
             const originalMethod = descriptor.value;
 
@@ -254,7 +255,10 @@ export class PerformanceMonitor {
                     throw err;
                 } finally {
                     const duration = performance.now() - start;
-                    this.metrics.recordOperation(operationName, duration, error);
+                    // Use captured metrics reference instead of this.metrics
+                    if (metrics) {
+                        metrics.recordOperation(operationName, duration, error);
+                    }
                 }
             };
 

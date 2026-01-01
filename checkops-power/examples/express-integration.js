@@ -207,8 +207,9 @@ async function createExpressApp() {
     app.use('/api/checkops', checkopsRouter);
 
     // NEW v3.0.0: Batch operations endpoints
-    app.post('/api/checkops/batch/forms', async (req, res) => {
+    checkopsRouter.post('/batch/forms', async (req, res) => {
         try {
+            const start = performance.now();
             const { forms } = req.body;
 
             if (!Array.isArray(forms) || forms.length === 0) {
@@ -229,7 +230,7 @@ async function createExpressApp() {
                 success: true,
                 data: result,
                 count: result.length,
-                processingTime: `${performance.now()}ms`
+                processingTime: `${(performance.now() - start).toFixed(2)}ms`
             });
         } catch (error) {
             res.status(400).json({
@@ -240,7 +241,7 @@ async function createExpressApp() {
         }
     });
 
-    app.post('/api/checkops/batch/submissions', async (req, res) => {
+    checkopsRouter.post('/batch/submissions', async (req, res) => {
         try {
             const { formId, submissions } = req.body;
 
@@ -277,7 +278,7 @@ async function createExpressApp() {
         }
     });
 
-    app.post('/api/checkops/batch/questions', async (req, res) => {
+    checkopsRouter.post('/batch/questions', async (req, res) => {
         try {
             const { questions } = req.body;
 
@@ -310,7 +311,7 @@ async function createExpressApp() {
     });
 
     // NEW v3.0.0: Cache management endpoints
-    app.get('/api/checkops/cache/stats', (req, res) => {
+    checkopsRouter.get('/cache/stats', (req, res) => {
         try {
             const cacheStats = req.checkops.getCacheStats ? req.checkops.getCacheStats() : null;
             if (!cacheStats) {
@@ -337,7 +338,7 @@ async function createExpressApp() {
         }
     });
 
-    app.delete('/api/checkops/cache/:type?', async (req, res) => {
+    checkopsRouter.delete('/cache/:type?', async (req, res) => {
         try {
             const { type } = req.params;
             const { id } = req.query;

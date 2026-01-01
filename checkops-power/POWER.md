@@ -50,7 +50,7 @@ The CheckOps Power v3.0.0 provides:
 8. **Advanced Caching**: Intelligent caching with automatic invalidation
 9. **Health Monitoring**: Comprehensive system health assessment
 10. **Production Analytics**: Performance trends and optimization insights
-=======
+
 The CheckOps Power provides complete guidance for integrating CheckOps into Node.js projects with:
 
 1. **Step-by-step Setup**: Complete installation and configuration instructions
@@ -59,11 +59,9 @@ The CheckOps Power provides complete guidance for integrating CheckOps into Node
 4. **Best Practices**: Security, performance, and deployment recommendations
 5. **Troubleshooting**: Common issues and solutions
 6. **Advanced Patterns**: Complex workflows and enterprise features
->>>>>>> main
 
 ## Prerequisites
 
-<<<<<<< HEAD
 When activated, this power will:
 
 1. Install CheckOps v3.0.0: `npm install @saiqa-tech/checkops@^3.0.0 pg`
@@ -122,7 +120,7 @@ import CheckOps, {
     metricsMiddleware,
     withMonitoring 
 } from '@saiqa-tech/checkops';
-=======
+
 Before starting, ensure you have:
 - Node.js 24+ installed
 - PostgreSQL 18+ running and accessible
@@ -178,7 +176,6 @@ Create a basic CheckOps setup file (`checkops-setup.js`):
 ```javascript
 import CheckOps from '@saiqa-tech/checkops';
 import dotenv from 'dotenv';
->>>>>>> main
 
 // Load environment variables
 dotenv.config();
@@ -199,7 +196,6 @@ const checkops = new CheckOps({
   statement_timeout: 30000,
 });
 
-<<<<<<< HEAD
 await checkops.initialize();
 
 // Enable v3.0.0 Monitoring Features
@@ -213,7 +209,7 @@ app.use(metricsMiddleware()); // Express middleware for request monitoring
 ```javascript
 // Start real-time monitoring
 productionMetrics.startMonitoring(30000); // 30-second intervals
-=======
+
 // Initialize and test connection
 async function setupCheckOps() {
   try {
@@ -641,12 +637,10 @@ GRANT ALL PRIVILEGES ON DATABASE your_database_name TO your_database_user;
 \c your_database_name;
 GRANT ALL ON SCHEMA public TO your_database_user;
 ```
->>>>>>> main
 
 // Get comprehensive metrics
 const metrics = productionMetrics.exportMetricsReport('json');
 
-<<<<<<< HEAD
 // Check system health
 const health = productionMetrics.getHealthStatus();
 // Returns: { status: 'HEALTHY', details: {...}, alerts: [] }
@@ -775,7 +769,7 @@ app.get('/health', (req, res) => {
 - **v3.0.0 Documentation**: Complete API reference with performance monitoring guides
 - **Migration Guide**: Detailed upgrade instructions from v2.x.x to v3.0.0
 - **Performance Benchmarks**: Real-world performance validation results
-=======
+
 For production deployment, refer to the production-deployment steering guide which covers:
 - Environment configuration
 - Database security
@@ -800,4 +794,3 @@ For production deployment, refer to the production-deployment steering guide whi
 5. Monitor and optimize performance
 
 This power provides comprehensive guidance for integrating CheckOps into your Node.js applications. Use the steering guides for detailed workflows and best practices.
->>>>>>> main

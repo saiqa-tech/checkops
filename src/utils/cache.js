@@ -152,6 +152,17 @@ export class LRUCache {
 
         return entries;
     }
+
+    // Peek at a value without updating LRU order or TTL
+    peek(key) {
+        // Access the underlying Map directly without triggering LRU behavior
+        const entries = Array.from(this.cache.entries());
+        const entry = entries.find(([k]) => k === key);
+        if (!entry) {
+            return undefined;
+        }
+        return entry[1].value;
+    }
 }
 
 /**
@@ -231,7 +242,7 @@ export class CheckOpsCache {
         // Clear submission cache entries for this form
         const submissionKeys = this.submissionCache.keys();
         submissionKeys.forEach(key => {
-            const submission = this.submissionCache.get(key);
+            const submission = this.submissionCache.peek(key);
             if (submission && submission.formId === formId) {
                 this.submissionCache.delete(key);
             }
@@ -242,8 +253,12 @@ export class CheckOpsCache {
         // When a question is updated, invalidate question caches that contain it
         const questionKeys = this.questionCache.keys();
         questionKeys.forEach(key => {
-            if (key.includes(questionId)) {
-                this.questionCache.delete(key);
+            // Parse the cache key to extract question IDs (format: "questions:id1,id2,id3")
+            if (key.startsWith('questions:')) {
+                const questionIds = key.substring('questions:'.length).split(',');
+                if (questionIds.includes(questionId)) {
+                    this.questionCache.delete(key);
+                }
             }
         });
     }

@@ -62,8 +62,8 @@ describe('Stats Calculation Optimization Performance', () => {
             }),
         };
 
-        // Mock getPool
-        jest.doMock('../../src/config/database.js', () => ({
+        // Mock getPool to return our mock pool
+        jest.unstable_mockModule('../../src/config/database.js', () => ({
             getPool: jest.fn(() => mockPool),
         }));
 

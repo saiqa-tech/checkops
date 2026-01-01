@@ -5,12 +5,25 @@
 
 import { getPool } from '../config/database.js';
 
+// Add identifier validation for SQL injection prevention
+const IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+function validateIdentifier(identifier, name = 'identifier') {
+    if (!identifier || typeof identifier !== 'string') {
+        throw new Error(`Invalid ${name}: must be a non-empty string`);
+    }
+    if (!IDENTIFIER_REGEX.test(identifier)) {
+        throw new Error(`Invalid ${name}: contains illegal characters`);
+    }
+    return identifier;
+}
+
 /**
  * Query Builder for dynamic, optimized SQL generation
  */
 export class QueryBuilder {
     constructor(tableName) {
-        this.tableName = tableName;
+        this.tableName = validateIdentifier(tableName, 'table name');
         this.selectFields = ['*'];
         this.whereConditions = [];
         this.joinClauses = [];
@@ -23,16 +36,24 @@ export class QueryBuilder {
 
     select(fields) {
         if (Array.isArray(fields)) {
-            this.selectFields = fields;
+            this.selectFields = fields.map(f => validateIdentifier(f, 'field'));
         } else if (typeof fields === 'string') {
-            this.selectFields = [fields];
+            this.selectFields = [validateIdentifier(fields, 'field')];
         }
         return this;
     }
 
     where(condition, value) {
         if (value !== undefined && value !== null) {
-            this.whereConditions.push(`${condition} = $${this.paramIndex++}`);
+            // Parse condition to validate field name
+            const fieldMatch = condition.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*([><=!]+)\s*$/);
+            if (!fieldMatch) {
+                throw new Error(`Invalid where condition format: ${condition}`);
+            }
+            const [, fieldName, operator] = fieldMatch;
+            validateIdentifier(fieldName, 'field name');
+
+            this.whereConditions.push(`${fieldName} ${operator} $${this.paramIndex++}`);
             this.parameters.push(value);
         }
         return this;
@@ -40,6 +61,7 @@ export class QueryBuilder {
 
     whereIn(field, values) {
         if (Array.isArray(values) && values.length > 0) {
+            validateIdentifier(field, 'field name');
             const placeholders = values.map(() => `$${this.paramIndex++}`).join(', ');
             this.whereConditions.push(`${field} IN (${placeholders})`);
             this.parameters.push(...values);
@@ -49,6 +71,7 @@ export class QueryBuilder {
 
     whereLike(field, value) {
         if (value) {
+            validateIdentifier(field, 'field name');
             this.whereConditions.push(`${field} ILIKE $${this.paramIndex++}`);
             this.parameters.push(`%${value}%`);
         }
@@ -56,6 +79,7 @@ export class QueryBuilder {
     }
 
     whereRange(field, min, max) {
+        validateIdentifier(field, 'field name');
         if (min !== undefined && min !== null) {
             this.whereConditions.push(`${field} >= $${this.paramIndex++}`);
             this.parameters.push(min);
@@ -68,17 +92,33 @@ export class QueryBuilder {
     }
 
     join(table, condition) {
+        validateIdentifier(table, 'table name');
+        // Validate join condition format (basic validation)
+        if (!condition || typeof condition !== 'string') {
+            throw new Error('Join condition must be a non-empty string');
+        }
         this.joinClauses.push(`JOIN ${table} ON ${condition}`);
         return this;
     }
 
     leftJoin(table, condition) {
+        validateIdentifier(table, 'table name');
+        // Validate join condition format (basic validation)
+        if (!condition || typeof condition !== 'string') {
+            throw new Error('Join condition must be a non-empty string');
+        }
         this.joinClauses.push(`LEFT JOIN ${table} ON ${condition}`);
         return this;
     }
 
     orderBy(field, direction = 'ASC') {
-        this.orderByFields.push(`${field} ${direction.toUpperCase()}`);
+        validateIdentifier(field, 'field name');
+        const validDirections = ['ASC', 'DESC'];
+        const upperDirection = direction.toUpperCase();
+        if (!validDirections.includes(upperDirection)) {
+            throw new Error(`Invalid order direction: ${direction}. Must be ASC or DESC`);
+        }
+        this.orderByFields.push(`${field} ${upperDirection}`);
         return this;
     }
 
@@ -139,8 +179,8 @@ export class QueryBuilder {
  */
 export class CursorPaginator {
     constructor(tableName, cursorField = 'id') {
-        this.tableName = tableName;
-        this.cursorField = cursorField;
+        this.tableName = validateIdentifier(tableName, 'table name');
+        this.cursorField = validateIdentifier(cursorField, 'cursor field');
     }
 
     async paginate({
@@ -283,6 +323,7 @@ export class BulkOperationOptimizer {
             return [];
         }
 
+        validateIdentifier(tableName, 'table name');
         const pool = getPool();
         const results = [];
 
@@ -292,6 +333,8 @@ export class BulkOperationOptimizer {
 
             // Build bulk insert query
             const fields = Object.keys(batch[0]);
+            // Validate field names
+            fields.forEach(field => validateIdentifier(field, 'field name'));
             const values = [];
             const placeholders = [];
             let paramIndex = 1;
@@ -320,6 +363,8 @@ export class BulkOperationOptimizer {
             return [];
         }
 
+        validateIdentifier(tableName, 'table name');
+        validateIdentifier(keyField, 'key field');
         const pool = getPool();
         const client = await pool.connect();
         const results = [];
@@ -373,6 +418,8 @@ export class BulkOperationOptimizer {
             return [];
         }
 
+        validateIdentifier(tableName, 'table name');
+        validateIdentifier(keyField, 'key field');
         const pool = getPool();
         const results = [];
 
@@ -400,6 +447,7 @@ export class BulkOperationOptimizer {
  */
 export class QueryAnalyzer {
     static async analyzeTableStats(tableName) {
+        validateIdentifier(tableName, 'table name');
         const pool = getPool();
 
         const query = `
@@ -418,6 +466,7 @@ export class QueryAnalyzer {
     }
 
     static async getTableSize(tableName) {
+        validateIdentifier(tableName, 'table name');
         const pool = getPool();
 
         const query = `
@@ -432,6 +481,16 @@ export class QueryAnalyzer {
     }
 
     static async explainQuery(query, parameters = []) {
+        // Environment safeguard - prevent EXPLAIN ANALYZE in production
+        if (process.env.NODE_ENV === 'production' && !process.env.ENABLE_EXPLAIN) {
+            console.warn('EXPLAIN ANALYZE disabled in production for security. Set ENABLE_EXPLAIN=true to override.');
+            return {
+                disabled: true,
+                reason: 'EXPLAIN ANALYZE disabled in production environment',
+                suggestion: 'Set ENABLE_EXPLAIN=true environment variable to enable'
+            };
+        }
+
         const pool = getPool();
 
         const explainQuery = `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${query}`;
