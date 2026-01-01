@@ -6,14 +6,19 @@ import {
     CallToolRequestSchema,
     ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import CheckOps from '@saiqa-tech/checkops';
+import CheckOps, {
+    productionMetrics,
+    metricsCollector,
+    withMonitoring,
+    recordBatchOperation
+} from '@saiqa-tech/checkops';
 
 class CheckOpsMCPServer {
     constructor() {
         this.server = new Server(
             {
                 name: 'checkops-tools',
-                version: '1.0.0',
+                version: '3.0.0',
             },
             {
                 capabilities: {
@@ -23,6 +28,7 @@ class CheckOpsMCPServer {
         );
 
         this.checkops = null;
+        this.monitoringEnabled = false;
         this.setupToolHandlers();
     }
 
@@ -39,9 +45,22 @@ class CheckOpsMCPServer {
             });
 
             await this.checkops.initialize();
+
+            // Enable monitoring if requested
+            if (process.env.ENABLE_MONITORING === 'true') {
+                this.enableMonitoring();
+            }
+
             return this.checkops;
         } catch (error) {
             throw new Error(`Failed to initialize CheckOps: ${error.message}`);
+        }
+    }
+
+    enableMonitoring() {
+        if (!this.monitoringEnabled) {
+            productionMetrics.startMonitoring(60000); // 1 minute intervals
+            this.monitoringEnabled = true;
         }
     }
 
@@ -158,6 +177,154 @@ class CheckOpsMCPServer {
                         },
                     },
                 },
+                // NEW v3.0.0 PERFORMANCE MONITORING TOOLS
+                {
+                    name: 'checkops_start_monitoring',
+                    description: 'Start real-time performance monitoring with configurable intervals',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            intervalMs: {
+                                type: 'number',
+                                description: 'Monitoring interval in milliseconds (default: 60000)',
+                                default: 60000
+                            },
+                        },
+                    },
+                },
+                {
+                    name: 'checkops_get_metrics',
+                    description: 'Get comprehensive performance metrics and statistics',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            format: {
+                                type: 'string',
+                                description: 'Output format: json or text',
+                                enum: ['json', 'text'],
+                                default: 'json'
+                            },
+                        },
+                    },
+                },
+                {
+                    name: 'checkops_get_health_status',
+                    description: 'Get system health status with detailed assessment',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {},
+                    },
+                },
+                {
+                    name: 'checkops_get_performance_trends',
+                    description: 'Get performance trends and historical analysis',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            timeRangeMinutes: {
+                                type: 'number',
+                                description: 'Time range in minutes for trend analysis',
+                                default: 60
+                            },
+                        },
+                    },
+                },
+                // NEW v3.0.0 BATCH OPERATIONS
+                {
+                    name: 'checkops_bulk_create_forms',
+                    description: 'Create multiple forms in a single optimized operation',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            forms: {
+                                type: 'array',
+                                description: 'Array of form objects to create',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        title: { type: 'string' },
+                                        description: { type: 'string' },
+                                        questions: { type: 'array' },
+                                        metadata: { type: 'object' },
+                                    },
+                                    required: ['title', 'questions'],
+                                },
+                            },
+                        },
+                        required: ['forms'],
+                    },
+                },
+                {
+                    name: 'checkops_bulk_create_submissions',
+                    description: 'Create multiple submissions for a form in a single operation',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            formId: { type: 'string', description: 'Form ID' },
+                            submissions: {
+                                type: 'array',
+                                description: 'Array of submission data objects',
+                                items: {
+                                    type: 'object',
+                                    description: 'Submission data as key-value pairs',
+                                },
+                            },
+                        },
+                        required: ['formId', 'submissions'],
+                    },
+                },
+                {
+                    name: 'checkops_bulk_create_questions',
+                    description: 'Create multiple reusable questions in a single operation',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            questions: {
+                                type: 'array',
+                                description: 'Array of question objects to create',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        questionText: { type: 'string' },
+                                        questionType: { type: 'string' },
+                                        options: { type: 'array' },
+                                        validationRules: { type: 'object' },
+                                    },
+                                    required: ['questionText', 'questionType'],
+                                },
+                            },
+                        },
+                        required: ['questions'],
+                    },
+                },
+                // NEW v3.0.0 CACHE MANAGEMENT
+                {
+                    name: 'checkops_get_cache_stats',
+                    description: 'Get comprehensive cache statistics and performance metrics',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {},
+                    },
+                },
+                {
+                    name: 'checkops_clear_cache',
+                    description: 'Clear cache for specific items or all cached data',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            type: {
+                                type: 'string',
+                                description: 'Cache type to clear: form, question, stats, submission, or all',
+                                enum: ['form', 'question', 'stats', 'submission', 'all'],
+                                default: 'all'
+                            },
+                            id: {
+                                type: 'string',
+                                description: 'Specific ID to clear (optional, clears all if not provided)'
+                            },
+                        },
+                    },
+                },
             ],
         }));
 
@@ -167,6 +334,20 @@ class CheckOpsMCPServer {
             try {
                 const checkops = await this.initializeCheckOps();
 
+                // Route to appropriate handler based on tool category
+                if (['checkops_start_monitoring', 'checkops_get_metrics', 'checkops_get_health_status', 'checkops_get_performance_trends'].includes(name)) {
+                    return await this.handleMonitoringTools(name, args, checkops);
+                }
+
+                if (['checkops_bulk_create_forms', 'checkops_bulk_create_submissions', 'checkops_bulk_create_questions'].includes(name)) {
+                    return await this.handleBatchOperations(name, args, checkops);
+                }
+
+                if (['checkops_get_cache_stats', 'checkops_clear_cache'].includes(name)) {
+                    return await this.handleCacheOperations(name, args, checkops);
+                }
+
+                // Original v2.x.x tools
                 switch (name) {
                     case 'checkops_test_connection':
                         return {
@@ -309,6 +490,163 @@ class CheckOpsMCPServer {
                 };
             }
         });
+    }
+
+    // NEW v3.0.0 TOOL HANDLERS
+    async handleMonitoringTools(name, args, checkops) {
+        switch (name) {
+            case 'checkops_start_monitoring':
+                this.enableMonitoring();
+                if (args.intervalMs) {
+                    productionMetrics.startMonitoring(args.intervalMs);
+                }
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: `Performance monitoring started with ${args.intervalMs || 60000}ms intervals`,
+                        },
+                    ],
+                };
+
+            case 'checkops_get_metrics':
+                const metrics = productionMetrics.exportMetricsReport(args.format || 'json');
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: typeof metrics === 'string' ? metrics : JSON.stringify(metrics, null, 2),
+                        },
+                    ],
+                };
+
+            case 'checkops_get_health_status':
+                const health = productionMetrics.getHealthStatus();
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify(health, null, 2),
+                        },
+                    ],
+                };
+
+            case 'checkops_get_performance_trends':
+                const trends = productionMetrics.getPerformanceTrends(args.timeRangeMinutes || 60);
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify(trends, null, 2),
+                        },
+                    ],
+                };
+
+            default:
+                throw new Error(`Unknown monitoring tool: ${name}`);
+        }
+    }
+
+    async handleBatchOperations(name, args, checkops) {
+        switch (name) {
+            case 'checkops_bulk_create_forms':
+                const forms = await recordBatchOperation(
+                    'bulk_create_forms',
+                    args.forms.length,
+                    async () => await checkops.bulkCreateForms(args.forms)
+                )();
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: `Successfully created ${forms.length} forms in bulk operation`,
+                        },
+                        {
+                            type: 'text',
+                            text: JSON.stringify(forms, null, 2),
+                        },
+                    ],
+                };
+
+            case 'checkops_bulk_create_submissions':
+                const submissions = await recordBatchOperation(
+                    'bulk_create_submissions',
+                    args.submissions.length,
+                    async () => await checkops.bulkCreateSubmissions(args.formId, args.submissions)
+                )();
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: `Successfully created ${submissions.results?.length || 0} submissions, ${submissions.errors?.length || 0} errors`,
+                        },
+                        {
+                            type: 'text',
+                            text: JSON.stringify(submissions, null, 2),
+                        },
+                    ],
+                };
+
+            case 'checkops_bulk_create_questions':
+                const questions = await recordBatchOperation(
+                    'bulk_create_questions',
+                    args.questions.length,
+                    async () => await checkops.bulkCreateQuestions(args.questions)
+                )();
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: `Successfully created ${questions.length} questions in bulk operation`,
+                        },
+                        {
+                            type: 'text',
+                            text: JSON.stringify(questions, null, 2),
+                        },
+                    ],
+                };
+
+            default:
+                throw new Error(`Unknown batch operation: ${name}`);
+        }
+    }
+
+    async handleCacheOperations(name, args, checkops) {
+        switch (name) {
+            case 'checkops_get_cache_stats':
+                const cacheStats = checkops.getCacheStats ? checkops.getCacheStats() : { message: 'Cache statistics not available' };
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify(cacheStats, null, 2),
+                        },
+                    ],
+                };
+
+            case 'checkops_clear_cache':
+                let clearResult;
+                if (checkops.clearCache) {
+                    clearResult = await checkops.clearCache(args.type || 'all', args.id);
+                } else {
+                    clearResult = { message: 'Cache clearing not available in this version' };
+                }
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: `Cache cleared: ${args.type || 'all'}${args.id ? ` (ID: ${args.id})` : ''}`,
+                        },
+                        {
+                            type: 'text',
+                            text: JSON.stringify(clearResult, null, 2),
+                        },
+                    ],
+                };
+
+            default:
+                throw new Error(`Unknown cache operation: ${name}`);
+        }
     }
 
     async run() {
