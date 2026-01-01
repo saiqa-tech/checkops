@@ -2,8 +2,11 @@ import { Submission } from '../models/Submission.js';
 import { Form } from '../models/Form.js';
 import { Question } from '../models/Question.js';
 import { validateRequired, validateSubmissionData } from '../utils/validation.js';
+import { validateAndSanitizeSubmissionData } from '../utils/optimizedValidation.js';
 import { sanitizeObject } from '../utils/sanitization.js';
 import { OptionUtils } from '../utils/optionUtils.js';
+import { getPool } from '../config/database.js';
+import { checkOpsCache } from '../utils/cache.js';
 
 export class SubmissionService {
   async createSubmission({ formId, submissionData, metadata = {} }) {
@@ -18,18 +21,24 @@ export class SubmissionService {
 
     const questionsWithDetails = await this._getQuestionsWithDetails(form.questions);
 
-    const transformedData = this._transformSubmissionToKeys(submissionData, questionsWithDetails);
+    // PHASE 3.2: Use optimized validation pipeline
+    const sanitizedSubmissionData = validateAndSanitizeSubmissionData(
+      submissionData,
+      questionsWithDetails
+    );
 
-    validateSubmissionData(transformedData, questionsWithDetails);
-
-    const sanitizedSubmissionData = sanitizeObject(transformedData);
     const sanitizedMetadata = sanitizeObject(metadata);
 
-    return await Submission.create({
+    const submission = await Submission.create({
       formId,
       submissionData: sanitizedSubmissionData,
       metadata: sanitizedMetadata,
     });
+
+    // Invalidate stats cache since we have a new submission
+    checkOpsCache.deleteStats(formId);
+
+    return submission;
   }
 
   async getSubmissionById(id) {
@@ -104,70 +113,198 @@ export class SubmissionService {
   async getSubmissionStats(formId) {
     validateRequired(formId, 'Form ID');
 
-    const submissions = await Submission.findByFormId(formId, { limit: 10000 });
+    // Check cache first
+    const cachedStats = checkOpsCache.getStats(formId);
+    if (cachedStats) {
+      return cachedStats;
+    }
+
+    // OPTIMIZATION: Use database aggregation instead of loading all submissions into memory
+    const pool = getPool();
+
+    // Step 1: Get basic stats with single efficient query
+    const basicStatsQuery = `
+      SELECT 
+        COUNT(*) as total_submissions,
+        MIN(submitted_at) as first_submission,
+        MAX(submitted_at) as last_submission
+      FROM submissions
+      WHERE form_id = $1
+    `;
+
+    const basicStatsResult = await pool.query(basicStatsQuery, [formId]);
+    const basicStats = basicStatsResult.rows[0];
+
+    // Step 2: Get form and question details (using our optimized enrichQuestions)
     const form = await Form.findById(formId);
     const questionsWithDetails = await this._getQuestionsWithDetails(form.questions);
 
+    // Step 3: Build stats object with database aggregation
     const stats = {
-      totalSubmissions: submissions.length,
+      totalSubmissions: parseInt(basicStats.total_submissions, 10),
+      firstSubmission: basicStats.first_submission,
+      lastSubmission: basicStats.last_submission,
       questionStats: {},
     };
 
-    questionsWithDetails.forEach((question) => {
+    // Step 4: Calculate stats per question using database aggregation
+    for (const question of questionsWithDetails) {
       const questionId = question.questionId || question.id;
-      stats.questionStats[questionId] = {
-        questionText: question.questionText,
-        questionType: question.questionType,
-        totalAnswers: 0,
-        emptyAnswers: 0,
-        uniqueAnswers: new Set(),
-        answerDistribution: {},
-        _keyDistribution: {},
-      };
-    });
+      stats.questionStats[questionId] = await this._getQuestionStatsFromDB(formId, questionId, question);
+    }
 
-    submissions.forEach((submission) => {
-      questionsWithDetails.forEach((question) => {
-        const questionId = question.questionId || question.id;
-        const answer = submission.submissionData[questionId];
-
-        const stat = stats.questionStats[questionId];
-
-        if (answer !== undefined && answer !== null && answer !== '') {
-          stat.totalAnswers++;
-          stat.uniqueAnswers.add(JSON.stringify(answer));
-
-          if (question.options && OptionUtils.requiresOptions(question.questionType)) {
-            if (Array.isArray(answer)) {
-              answer.forEach((key) => {
-                const option = question.options.find((opt) => opt.key === key);
-                const label = option ? option.label : key;
-                stat.answerDistribution[label] = (stat.answerDistribution[label] || 0) + 1;
-                stat._keyDistribution[key] = (stat._keyDistribution[key] || 0) + 1;
-              });
-            } else {
-              const option = question.options.find((opt) => opt.key === answer);
-              const label = option ? option.label : answer;
-              stat.answerDistribution[label] = (stat.answerDistribution[label] || 0) + 1;
-              stat._keyDistribution[answer] = (stat._keyDistribution[answer] || 0) + 1;
-            }
-          } else {
-            const answerKey = Array.isArray(answer) ? answer.join(', ') : String(answer);
-            stat.answerDistribution[answerKey] = (stat.answerDistribution[answerKey] || 0) + 1;
-          }
-        } else {
-          stat.emptyAnswers++;
-        }
-      });
-    });
-
-    Object.keys(stats.questionStats).forEach((questionId) => {
-      const stat = stats.questionStats[questionId];
-      stat.uniqueAnswerCount = stat.uniqueAnswers.size;
-      delete stat.uniqueAnswers;
-    });
+    // Cache the results (3 minute TTL for stats)
+    checkOpsCache.setStats(formId, stats, 180000);
 
     return stats;
+  }
+
+  async _getQuestionStatsFromDB(formId, questionId, question) {
+    const pool = getPool();
+
+    // OPTIMIZATION: Single query per question using PostgreSQL JSONB functions
+    const query = `
+      WITH question_answers AS (
+        SELECT 
+          submission_data->$2 as answer
+        FROM submissions
+        WHERE form_id = $1
+      )
+      SELECT 
+        COUNT(*) as total_answers,
+        COUNT(*) FILTER (WHERE answer IS NULL OR answer::text = 'null' OR answer::text = '""') as empty_answers,
+        COUNT(DISTINCT answer) as unique_answer_count
+      FROM question_answers
+    `;
+
+    const result = await pool.query(query, [formId, questionId]);
+    const row = result.rows[0];
+
+    const baseStats = {
+      questionText: question.questionText,
+      questionType: question.questionType,
+      totalAnswers: parseInt(row.total_answers, 10) - parseInt(row.empty_answers, 10),
+      emptyAnswers: parseInt(row.empty_answers, 10),
+      uniqueAnswerCount: parseInt(row.unique_answer_count, 10),
+    };
+
+    // OPTIMIZATION: Only calculate distribution for questions with options
+    if (question.options && OptionUtils.requiresOptions(question.questionType)) {
+      baseStats.answerDistribution = await this._getAnswerDistributionFromDB(formId, questionId, question);
+      baseStats._keyDistribution = await this._getKeyDistributionFromDB(formId, questionId, question);
+    } else {
+      // For non-option questions, get simple answer distribution
+      baseStats.answerDistribution = await this._getSimpleAnswerDistributionFromDB(formId, questionId);
+    }
+
+    return baseStats;
+  }
+
+  async _getAnswerDistributionFromDB(formId, questionId, question) {
+    const pool = getPool();
+
+    // Use PostgreSQL's aggregation for option counting
+    const query = `
+      SELECT 
+        submission_data->$2 as answer,
+        COUNT(*) as count
+      FROM submissions
+      WHERE form_id = $1
+        AND submission_data->$2 IS NOT NULL
+        AND submission_data->$2::text != 'null'
+        AND submission_data->$2::text != '""'
+      GROUP BY submission_data->$2
+    `;
+
+    const result = await pool.query(query, [formId, questionId]);
+
+    const distribution = {};
+
+    result.rows.forEach(row => {
+      const answer = row.answer;
+      const count = parseInt(row.count, 10);
+
+      if (Array.isArray(answer)) {
+        // Handle multi-select answers
+        answer.forEach(key => {
+          const option = question.options.find(opt => opt.key === key);
+          const label = option ? option.label : key;
+          distribution[label] = (distribution[label] || 0) + count;
+        });
+      } else {
+        // Handle single-select answers
+        const option = question.options.find(opt => opt.key === answer);
+        const label = option ? option.label : answer;
+        distribution[label] = (distribution[label] || 0) + count;
+      }
+    });
+
+    return distribution;
+  }
+
+  async _getKeyDistributionFromDB(formId, questionId, question) {
+    const pool = getPool();
+
+    const query = `
+      SELECT 
+        submission_data->$2 as answer,
+        COUNT(*) as count
+      FROM submissions
+      WHERE form_id = $1
+        AND submission_data->$2 IS NOT NULL
+        AND submission_data->$2::text != 'null'
+        AND submission_data->$2::text != '""'
+      GROUP BY submission_data->$2
+    `;
+
+    const result = await pool.query(query, [formId, questionId]);
+
+    const keyDistribution = {};
+
+    result.rows.forEach(row => {
+      const answer = row.answer;
+      const count = parseInt(row.count, 10);
+
+      if (Array.isArray(answer)) {
+        answer.forEach(key => {
+          keyDistribution[key] = (keyDistribution[key] || 0) + count;
+        });
+      } else {
+        keyDistribution[answer] = (keyDistribution[answer] || 0) + count;
+      }
+    });
+
+    return keyDistribution;
+  }
+
+  async _getSimpleAnswerDistributionFromDB(formId, questionId) {
+    const pool = getPool();
+
+    const query = `
+      SELECT 
+        CASE 
+          WHEN jsonb_typeof(submission_data->$2) = 'array' THEN
+            array_to_string(ARRAY(SELECT jsonb_array_elements_text(submission_data->$2)), ', ')
+          ELSE
+            submission_data->>$2
+        END as answer_text,
+        COUNT(*) as count
+      FROM submissions
+      WHERE form_id = $1
+        AND submission_data->$2 IS NOT NULL
+        AND submission_data->$2::text != 'null'
+        AND submission_data->$2::text != '""'
+      GROUP BY answer_text
+    `;
+
+    const result = await pool.query(query, [formId, questionId]);
+
+    const distribution = {};
+    result.rows.forEach(row => {
+      distribution[row.answer_text] = parseInt(row.count, 10);
+    });
+
+    return distribution;
   }
 
   async _getQuestionsWithDetails(formQuestions) {

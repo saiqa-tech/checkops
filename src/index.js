@@ -3,6 +3,9 @@ import { FormService } from './services/FormService.js';
 import { QuestionService } from './services/QuestionService.js';
 import { SubmissionService } from './services/SubmissionService.js';
 import * as errors from './utils/errors.js';
+import { metricsCollector, performanceMonitor } from './utils/metrics.js';
+import { productionMetrics, metricsMiddleware, getHealthCheckData } from './utils/productionMetrics.js';
+import { withMonitoring, withModelMonitoring, recordBatchOperation } from './utils/monitoringWrapper.js';
 
 export class CheckOps {
   constructor(config = {}) {
@@ -199,4 +202,13 @@ export {
   FormService,
   QuestionService,
   SubmissionService,
+  // Phase 4: Performance Monitoring & Testing
+  metricsCollector,
+  performanceMonitor,
+  productionMetrics,
+  metricsMiddleware,
+  getHealthCheckData,
+  withMonitoring,
+  withModelMonitoring,
+  recordBatchOperation,
 };

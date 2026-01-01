@@ -1,7 +1,7 @@
 {
   "name": "@saiqa-tech/checkops",
-  "version": "2.1.0",
-  "description": "A production-ready Node.js npm package that enables developers to create dynamic forms with centralized question reusability, stable option key-value system, and structured data submission capabilities",
+  "version": "3.0.0",
+  "description": "A high-performance, production-ready Node.js package for creating dynamic forms with advanced optimizations, real-time monitoring, centralized question reusability, and enterprise-grade performance capabilities",
   "main": "src/index.js",
   "type": "module",
   "engines": {
@@ -32,7 +32,15 @@
     "checkops",
     "submission",
     "postgresql",
-    "jsonb"
+    "jsonb",
+    "performance",
+    "monitoring",
+    "optimization",
+    "enterprise",
+    "high-performance",
+    "batch-operations",
+    "caching",
+    "metrics"
   ],
   "author": "Saiqa Tech",
   "license": "Apache-2.0",

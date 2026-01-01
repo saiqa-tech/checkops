@@ -46,14 +46,12 @@ export class Question {
 
   static async create({ questionText, questionType, options = null, validationRules = null, metadata = {} }) {
     const pool = getPool();
-    const client = await pool.connect();
+
+    // OPTIMIZATION: Simple operations don't need explicit transactions
+    const id = await generateQuestionId();
 
     try {
-      await client.query('BEGIN');
-
-      const id = await generateQuestionId(client);
-
-      const result = await client.query(
+      const result = await pool.query(
         `INSERT INTO question_bank (id, question_text, question_type, options, validation_rules, metadata, is_active)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
@@ -68,14 +66,9 @@ export class Question {
         ]
       );
 
-      await client.query('COMMIT');
-
       return Question.fromRow(result.rows[0]);
     } catch (error) {
-      await client.query('ROLLBACK');
       throw new DatabaseError('Failed to create question', error);
-    } finally {
-      client.release();
     }
   }
 
@@ -239,5 +232,96 @@ export class Question {
 
     const result = await pool.query(query, params);
     return parseInt(result.rows[0].count, 10);
+  }
+
+  // PHASE 3.1: Enhanced Batch Operations
+  static async createMany(questionsData) {
+    if (!Array.isArray(questionsData) || questionsData.length === 0) {
+      return [];
+    }
+
+    const pool = getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Generate all IDs first
+      const ids = [];
+      for (let i = 0; i < questionsData.length; i++) {
+        const id = await generateQuestionId();
+        ids.push(id);
+      }
+
+      // Build bulk insert query
+      const values = [];
+      const placeholders = [];
+      let paramIndex = 1;
+
+      questionsData.forEach((questionData, index) => {
+        const id = ids[index];
+        placeholders.push(
+          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`
+        );
+        values.push(
+          id,
+          questionData.questionText,
+          questionData.questionType,
+          questionData.options ? JSON.stringify(questionData.options) : null,
+          questionData.validationRules ? JSON.stringify(questionData.validationRules) : null,
+          JSON.stringify(questionData.metadata || {}),
+          true
+        );
+        paramIndex += 7;
+      });
+
+      const query = `
+        INSERT INTO question_bank (id, question_text, question_type, options, validation_rules, metadata, is_active)
+        VALUES ${placeholders.join(', ')}
+        RETURNING *
+      `;
+
+      const result = await client.query(query, values);
+      await client.query('COMMIT');
+
+      return result.rows.map(row => Question.fromRow(row));
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw new DatabaseError('Failed to create questions in bulk', error);
+    } finally {
+      client.release();
+    }
+  }
+
+  // PHASE 3.1: Optimized Bulk Delete
+  static async deleteMany(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return [];
+    }
+
+    const pool = getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Fetch questions before deletion for return value
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+      const selectQuery = `SELECT * FROM question_bank WHERE id IN (${placeholders})`;
+      const selectResult = await client.query(selectQuery, ids);
+      const questions = selectResult.rows.map(row => Question.fromRow(row));
+
+      // Bulk delete
+      const deleteQuery = `DELETE FROM question_bank WHERE id IN (${placeholders})`;
+      await client.query(deleteQuery, ids);
+
+      await client.query('COMMIT');
+      return questions;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw new DatabaseError('Failed to delete questions in bulk', error);
+    } finally {
+      client.release();
+    }
   }
 }
