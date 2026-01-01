@@ -58,7 +58,16 @@ class DatabaseManager extends EventEmitter {
       this.metrics.errors++;
       this.metrics.connectionErrors++;
       this.emit('pool-error', err, client);
-      console.error('Database pool error:', err);
+
+      // Use structured logging instead of console.error
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Database pool error:', {
+          error: err.message,
+          code: err.code,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       this.attemptReconnect();
     });
 
@@ -69,7 +78,13 @@ class DatabaseManager extends EventEmitter {
 
       // Set up client-level error handling
       client.on('error', (err) => {
-        console.error('Database client error:', err);
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Database client error:', {
+            error: err.message,
+            code: err.code,
+            timestamp: new Date().toISOString()
+          });
+        }
         this.metrics.connectionErrors++;
       });
     });
@@ -85,7 +100,14 @@ class DatabaseManager extends EventEmitter {
 
   async attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+      const errorMsg = `Max reconnection attempts (${this.maxReconnectAttempts}) reached`;
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(errorMsg, {
+          attempts: this.reconnectAttempts,
+          maxAttempts: this.maxReconnectAttempts,
+          timestamp: new Date().toISOString()
+        });
+      }
       this.emit('max-reconnect-attempts-reached');
       return;
     }
@@ -93,7 +115,9 @@ class DatabaseManager extends EventEmitter {
     this.reconnectAttempts++;
     const backoff = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
-    console.log(`Attempting database reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${backoff}ms`);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`Attempting database reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${backoff}ms`);
+    }
 
     setTimeout(async () => {
       try {

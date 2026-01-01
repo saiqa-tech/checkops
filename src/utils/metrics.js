@@ -15,6 +15,7 @@ export class MetricsCollector {
             connections: { active: 0, total: 0, errors: 0 },
         };
         this.startTime = Date.now();
+        this.maxOperationsHistory = 1000; // Prevent memory leaks
     }
 
     recordQuery(duration, query, error = null) {
@@ -26,6 +27,13 @@ export class MetricsCollector {
     }
 
     recordOperation(operation, duration, error = null) {
+        // Prevent memory leaks by limiting operation history
+        if (this.metrics.operations.size >= this.maxOperationsHistory) {
+            // Remove oldest entries (simple FIFO)
+            const firstKey = this.metrics.operations.keys().next().value;
+            this.metrics.operations.delete(firstKey);
+        }
+
         if (!this.metrics.operations.has(operation)) {
             this.metrics.operations.set(operation, {
                 count: 0,
@@ -46,6 +54,12 @@ export class MetricsCollector {
     }
 
     recordBatchOperation(operation, batchSize, duration, error = null) {
+        // Prevent memory leaks by limiting batch operation history
+        if (this.metrics.batchOperations.size >= this.maxOperationsHistory) {
+            const firstKey = this.metrics.batchOperations.keys().next().value;
+            this.metrics.batchOperations.delete(firstKey);
+        }
+
         if (!this.metrics.batchOperations.has(operation)) {
             this.metrics.batchOperations.set(operation, {
                 count: 0,

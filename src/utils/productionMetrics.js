@@ -21,6 +21,7 @@ export class ProductionMetricsCollector {
         this.monitoringInterval = null;
         this.metricsHistory = [];
         this.maxHistorySize = 1000; // Keep last 1000 data points
+        this.maxAlertsHistory = 100; // Prevent alert memory leaks
     }
 
     startMonitoring(intervalMs = 60000) { // Default: 1 minute
@@ -171,6 +172,12 @@ export class ProductionMetricsCollector {
         // Store and emit alerts
         if (alerts.length > 0) {
             this.alerts.push(...alerts);
+
+            // Prevent memory leaks by limiting alert history
+            if (this.alerts.length > this.maxAlertsHistory) {
+                this.alerts.splice(0, this.alerts.length - this.maxAlertsHistory);
+            }
+
             this.emitAlerts(alerts);
         }
     }

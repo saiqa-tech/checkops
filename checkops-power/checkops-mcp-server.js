@@ -53,7 +53,11 @@ class CheckOpsMCPServer {
 
             return this.checkops;
         } catch (error) {
-            throw new Error(`Failed to initialize CheckOps: ${error.message}`);
+            // Provide more specific error information
+            const errorMessage = error.code
+                ? `Failed to initialize CheckOps (${error.code}): ${error.message}`
+                : `Failed to initialize CheckOps: ${error.message}`;
+            throw new Error(errorMessage);
         }
     }
 
