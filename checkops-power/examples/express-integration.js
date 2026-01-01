@@ -365,7 +365,7 @@ async function createExpressApp() {
     });
 
     // Bulk submission endpoint
-    app.post('/api/forms/:formId/submissions/bulk', async (req, res) => {
+    checkopsRouter.post('/forms/:formId/submissions/bulk', async (req, res) => {
         try {
             const { formId } = req.params;
             const { submissions } = req.body;
@@ -391,7 +391,7 @@ async function createExpressApp() {
     });
 
     // Export submissions as CSV
-    app.get('/api/forms/:formId/export/csv', async (req, res) => {
+    checkopsRouter.get('/forms/:formId/export/csv', async (req, res) => {
         try {
             const { formId } = req.params;
 
@@ -418,7 +418,7 @@ async function createExpressApp() {
     });
 
     // Form analytics endpoint
-    app.get('/api/forms/:formId/analytics', async (req, res) => {
+    checkopsRouter.get('/forms/:formId/analytics', async (req, res) => {
         try {
             const { formId } = req.params;
 

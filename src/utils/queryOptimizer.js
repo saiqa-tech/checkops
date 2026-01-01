@@ -45,13 +45,28 @@ export class QueryBuilder {
 
     where(condition, value) {
         if (value !== undefined && value !== null) {
-            // Parse condition to validate field name
-            const fieldMatch = condition.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*([><=!]+)\s*$/);
+            // Parse condition to validate field name and extract operator
+            const trimmedCondition = condition.trim();
+
+            // Match field name optionally followed by operator
+            const fieldMatch = trimmedCondition.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*([><=!]*=?|[><])\s*$/) ||
+                trimmedCondition.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*$/);
+
             if (!fieldMatch) {
                 throw new Error(`Invalid where condition format: ${condition}`);
             }
-            const [, fieldName, operator] = fieldMatch;
+
+            const fieldName = fieldMatch[1];
+            const operator = fieldMatch[2] || '='; // Default to '=' if no operator provided
+
+            // Validate the field name
             validateIdentifier(fieldName, 'field name');
+
+            // Validate the operator
+            const validOperators = ['=', '!=', '<>', '<', '>', '<=', '>='];
+            if (!validOperators.includes(operator)) {
+                throw new Error(`Invalid operator: ${operator}. Must be one of: ${validOperators.join(', ')}`);
+            }
 
             this.whereConditions.push(`${fieldName} ${operator} $${this.paramIndex++}`);
             this.parameters.push(value);
@@ -384,6 +399,7 @@ export class BulkOperationOptimizer {
                     let paramIndex = 1;
 
                     Object.entries(updateData).forEach(([field, value]) => {
+                        validateIdentifier(field, 'field name');
                         setClauses.push(`${field} = $${paramIndex++}`);
                         values.push(value);
                     });
