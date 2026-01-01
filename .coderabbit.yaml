@@ -4,21 +4,6 @@
 # Language for reviews
 language: en-US
 
-# Path filters - exclude files from review
-path_filters: 
-  - "**/*.js"
-  - "**/*.json"
-  - "**/*.md"
-  - "**/*.sql"
-  - "**/*.yaml"
-  - "**/*.yml"
-  - "!node_modules/**"
-  - "!package-lock.json"
-  - "!*.log"
-  - "!coverage/**"
-  - "!dist/**"
-  - "!build/**"
-
 # Enable early access features
 early_access: true
 
@@ -32,8 +17,26 @@ reviews:
   # High-level summary
   high_level_summary: false
   
-  # Path-specific instructions
+  # Path-based exclusions (use path_instructions with ignore)
   path_instructions:
+    - path: "node_modules/**"
+      instructions: "Ignore this path"
+    
+    - path: "package-lock.json"
+      instructions: "Ignore this file"
+    
+    - path: "*.log"
+      instructions: "Ignore log files"
+    
+    - path: "coverage/**"
+      instructions: "Ignore coverage reports"
+    
+    - path: "dist/**"
+      instructions: "Ignore build artifacts"
+    
+    - path: "build/**"
+      instructions: "Ignore build artifacts"
+    
     - path: "**/*.js"
       instructions: |
         Focus on:
