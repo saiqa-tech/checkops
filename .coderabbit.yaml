@@ -17,26 +17,17 @@ reviews:
   # High-level summary
   high_level_summary: false
   
-  # Path-based exclusions (use path_instructions with ignore)
+  # Path filters for exclusions
+  path_filters:
+    - "!node_modules/**"
+    - "!package-lock.json"
+    - "!*.log"
+    - "!coverage/**"
+    - "!dist/**"
+    - "!build/**"
+  
+  # Path-based review instructions
   path_instructions:
-    - path: "node_modules/**"
-      instructions: "Ignore this path"
-    
-    - path: "package-lock.json"
-      instructions: "Ignore this file"
-    
-    - path: "*.log"
-      instructions: "Ignore log files"
-    
-    - path: "coverage/**"
-      instructions: "Ignore coverage reports"
-    
-    - path: "dist/**"
-      instructions: "Ignore build artifacts"
-    
-    - path: "build/**"
-      instructions: "Ignore build artifacts"
-    
     - path: "**/*.js"
       instructions: |
         Focus on:

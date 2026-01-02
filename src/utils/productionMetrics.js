@@ -245,19 +245,25 @@ export class ProductionMetricsCollector {
                 start: first.application.queries.avgTime,
                 end: last.application.queries.avgTime,
                 change: last.application.queries.avgTime - first.application.queries.avgTime,
-                percentChange: ((last.application.queries.avgTime - first.application.queries.avgTime) / first.application.queries.avgTime) * 100
+                percentChange: first.application.queries.avgTime > 0
+                    ? ((last.application.queries.avgTime - first.application.queries.avgTime) / first.application.queries.avgTime) * 100
+                    : null
             },
             cacheHitRate: {
                 start: first.application.cache.hitRate,
                 end: last.application.cache.hitRate,
                 change: last.application.cache.hitRate - first.application.cache.hitRate,
-                percentChange: ((last.application.cache.hitRate - first.application.cache.hitRate) / first.application.cache.hitRate) * 100
+                percentChange: first.application.cache.hitRate > 0
+                    ? ((last.application.cache.hitRate - first.application.cache.hitRate) / first.application.cache.hitRate) * 100
+                    : null
             },
             memoryUsage: {
                 start: first.system.memory.heapUsed,
                 end: last.system.memory.heapUsed,
                 change: last.system.memory.heapUsed - first.system.memory.heapUsed,
-                percentChange: ((last.system.memory.heapUsed - first.system.memory.heapUsed) / first.system.memory.heapUsed) * 100
+                percentChange: first.system.memory.heapUsed > 0
+                    ? ((last.system.memory.heapUsed - first.system.memory.heapUsed) / first.system.memory.heapUsed) * 100
+                    : null
             },
             queryCount: {
                 start: first.application.queries.count,

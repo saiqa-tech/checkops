@@ -157,7 +157,18 @@ class DatabaseManager extends EventEmitter {
       throw new Error('Database not initialized. Call initializeDatabase() first.');
     }
     if (!this.isHealthy) {
-      console.warn('Database is unhealthy, but allowing operation to proceed');
+      throw new Error('Database is unhealthy. Operations cannot proceed safely.');
+    }
+    return this.pool;
+  }
+
+  // Alternative method for operations that can handle unhealthy state
+  getPoolUnsafe() {
+    if (!this.pool) {
+      throw new Error('Database not initialized. Call initializeDatabase() first.');
+    }
+    if (!this.isHealthy) {
+      console.warn('Database is unhealthy, but allowing operation to proceed (unsafe mode)');
     }
     return this.pool;
   }
@@ -250,6 +261,7 @@ const dbManager = new DatabaseManager();
 
 export const initializeDatabase = dbManager.initializeDatabase.bind(dbManager);
 export const getPool = dbManager.getPool.bind(dbManager);
+export const getPoolUnsafe = dbManager.getPoolUnsafe.bind(dbManager);
 export const closeDatabase = dbManager.closeDatabase.bind(dbManager);
 export const testConnection = dbManager.testConnection.bind(dbManager);
 export const getMetrics = dbManager.getMetrics.bind(dbManager);
