@@ -34,36 +34,27 @@ export class Submission {
 
   static async create({ formId, submissionData, metadata = {} }) {
     const pool = getPool();
-    const client = await pool.connect();
+
+    // OPTIMIZATION: Simple operations don't need explicit transactions
+    // First verify the form exists
+    const formCheck = await pool.query('SELECT id FROM forms WHERE id = $1', [formId]);
+    if (formCheck.rows.length === 0) {
+      throw new NotFoundError('Form', formId);
+    }
+
+    const id = await generateSubmissionId();
 
     try {
-      await client.query('BEGIN');
-
-      const formCheck = await client.query('SELECT id FROM forms WHERE id = $1', [formId]);
-      if (formCheck.rows.length === 0) {
-        throw new NotFoundError('Form', formId);
-      }
-
-      const id = await generateSubmissionId(client);
-
-      const result = await client.query(
+      const result = await pool.query(
         `INSERT INTO submissions (id, form_id, submission_data, metadata)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
         [id, formId, JSON.stringify(submissionData), JSON.stringify(metadata)]
       );
 
-      await client.query('COMMIT');
-
       return Submission.fromRow(result.rows[0]);
     } catch (error) {
-      await client.query('ROLLBACK');
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
       throw new DatabaseError('Failed to create submission', error);
-    } finally {
-      client.release();
     }
   }
 
@@ -175,5 +166,134 @@ export class Submission {
 
     const result = await pool.query(query, params);
     return parseInt(result.rows[0].count, 10);
+  }
+
+  // PHASE 3.1: Enhanced Batch Operations
+  static async createMany(submissionsData) {
+    if (!Array.isArray(submissionsData) || submissionsData.length === 0) {
+      return [];
+    }
+
+    const pool = getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Verify all forms exist first
+      const formIds = [...new Set(submissionsData.map(s => s.formId))];
+      const formCheck = await client.query(
+        `SELECT id FROM forms WHERE id = ANY($1)`,
+        [formIds]
+      );
+
+      if (formCheck.rows.length !== formIds.length) {
+        const existingFormIds = formCheck.rows.map(row => row.id);
+        const missingFormIds = formIds.filter(id => !existingFormIds.includes(id));
+        throw new NotFoundError('Form', missingFormIds[0]);
+      }
+
+      // Generate all IDs first
+      const ids = [];
+      for (let i = 0; i < submissionsData.length; i++) {
+        const id = await generateSubmissionId();
+        ids.push(id);
+      }
+
+      // Build bulk insert query
+      const values = [];
+      const placeholders = [];
+      let paramIndex = 1;
+
+      submissionsData.forEach((submissionData, index) => {
+        const id = ids[index];
+        placeholders.push(
+          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3})`
+        );
+        values.push(
+          id,
+          submissionData.formId,
+          JSON.stringify(submissionData.submissionData),
+          JSON.stringify(submissionData.metadata || {})
+        );
+        paramIndex += 4;
+      });
+
+      const query = `
+        INSERT INTO submissions (id, form_id, submission_data, metadata)
+        VALUES ${placeholders.join(', ')}
+        RETURNING *
+      `;
+
+      const result = await client.query(query, values);
+      await client.query('COMMIT');
+
+      return result.rows.map(row => Submission.fromRow(row));
+    } catch (error) {
+      await client.query('ROLLBACK');
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      throw new DatabaseError('Failed to create submissions in bulk', error);
+    } finally {
+      client.release();
+    }
+  }
+
+  // PHASE 3.1: Optimized Bulk Delete
+  static async deleteMany(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return [];
+    }
+
+    const pool = getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Fetch submissions before deletion for return value
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+      const selectQuery = `SELECT * FROM submissions WHERE id IN (${placeholders})`;
+      const selectResult = await client.query(selectQuery, ids);
+      const submissions = selectResult.rows.map(row => Submission.fromRow(row));
+
+      // Bulk delete
+      const deleteQuery = `DELETE FROM submissions WHERE id IN (${placeholders})`;
+      await client.query(deleteQuery, ids);
+
+      await client.query('COMMIT');
+      return submissions;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw new DatabaseError('Failed to delete submissions in bulk', error);
+    } finally {
+      client.release();
+    }
+  }
+
+  // PHASE 3.1: Bulk Submission by Form
+  static async deleteByFormId(formId) {
+    const pool = getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Fetch submissions before deletion for return value
+      const selectResult = await client.query('SELECT * FROM submissions WHERE form_id = $1', [formId]);
+      const submissions = selectResult.rows.map(row => Submission.fromRow(row));
+
+      // Delete all submissions for the form
+      await client.query('DELETE FROM submissions WHERE form_id = $1', [formId]);
+
+      await client.query('COMMIT');
+      return submissions;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw new DatabaseError('Failed to delete submissions by form ID', error);
+    } finally {
+      client.release();
+    }
   }
 }
