@@ -240,6 +240,11 @@ export class ProductionMetricsCollector {
         const first = recentMetrics[0];
         const last = recentMetrics[recentMetrics.length - 1];
 
+        // Validate and coerce timeRangeMinutes to a finite number
+        const validTimeRange = Number.isFinite(timeRangeMinutes) && timeRangeMinutes > 0 ? timeRangeMinutes : 60;
+        const denominator = validTimeRange / 60;
+        const queryCountChange = last.application.queries.count - first.application.queries.count;
+
         const trends = {
             queryTime: {
                 start: first.application.queries.avgTime,
@@ -268,13 +273,13 @@ export class ProductionMetricsCollector {
             queryCount: {
                 start: first.application.queries.count,
                 end: last.application.queries.count,
-                change: last.application.queries.count - first.application.queries.count,
-                rate: (last.application.queries.count - first.application.queries.count) / (timeRangeMinutes / 60) // per hour
+                change: queryCountChange,
+                rate: denominator > 0 && Number.isFinite(denominator) ? queryCountChange / denominator : null // per hour
             }
         };
 
         return {
-            timeRange: `${timeRangeMinutes} minutes`,
+            timeRange: `${validTimeRange} minutes`,
             dataPoints: recentMetrics.length,
             trends
         };
