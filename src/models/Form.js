@@ -47,21 +47,7 @@ export class Form {
     // OPTIMIZATION: Simple operations don't need explicit transactions
     // PostgreSQL handles single statements atomically
     const id = await generateFormId();
-
-    // Preserve question bank relationships in metadata
-    const questionBankMapping = {};
-    questions.forEach((question, index) => {
-      if (question.questionId) {
-        questionBankMapping[`question_${index}`] = question.questionId;
-      }
-    });
-
-    const enhancedMetadata = {
-      ...metadata,
-      _questionBankMapping: questionBankMapping,
-      _createdAt: new Date().toISOString(),
-      _version: '3.0.0'
-    };
+    const enhancedMetadata = Form.buildEnhancedMetadata(questions, metadata);
 
     try {
       const result = await pool.query(
@@ -75,6 +61,23 @@ export class Form {
     } catch (error) {
       throw new DatabaseError('Failed to create form', error);
     }
+  }
+
+  static buildEnhancedMetadata(questions, metadata = {}) {
+    // Preserve question bank relationships in metadata
+    const questionBankMapping = {};
+    questions.forEach((question, index) => {
+      if (question.questionId) {
+        questionBankMapping[`question_${index}`] = question.questionId;
+      }
+    });
+
+    return {
+      ...metadata,
+      _questionBankMapping: questionBankMapping,
+      _createdAt: new Date().toISOString(),
+      _version: '3.0.0'
+    };
   }
 
   static async findById(id) {
@@ -211,6 +214,7 @@ export class Form {
 
       formsData.forEach((formData, index) => {
         const id = ids[index];
+        const enhancedMetadata = Form.buildEnhancedMetadata(formData.questions, formData.metadata);
         placeholders.push(
           `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5})`
         );
@@ -219,7 +223,7 @@ export class Form {
           formData.title,
           formData.description || '',
           JSON.stringify(formData.questions),
-          JSON.stringify(formData.metadata || {}),
+          JSON.stringify(enhancedMetadata),
           true
         );
         paramIndex += 6;

@@ -117,7 +117,7 @@ export function validateAndSanitizeQuestion(question) {
             sanitized.questionText = validateAndSanitizeString(question.questionText, 'Question text', 1, 1000);
         }
         if (question.questionType) {
-            const validTypes = ['text', 'number', 'email', 'select', 'multiselect', 'radio', 'checkbox', 'textarea'];
+            const validTypes = ['text', 'number', 'email', 'select', 'multiselect', 'radio', 'checkbox', 'textarea', 'phone', 'date', 'time', 'datetime', 'boolean', 'file', 'rating'];
             if (!validTypes.includes(question.questionType)) {
                 errors.push(`Invalid question type: ${question.questionType}`);
             } else {
@@ -161,7 +161,7 @@ export function validateAndSanitizeQuestion(question) {
     }
 
     // Validate question type
-    const validTypes = ['text', 'number', 'email', 'select', 'multiselect', 'radio', 'checkbox', 'textarea'];
+    const validTypes = ['text', 'number', 'email', 'select', 'multiselect', 'radio', 'checkbox', 'textarea', 'phone', 'date', 'time', 'datetime', 'boolean', 'file', 'rating'];
     if (!question.questionType || !validTypes.includes(question.questionType)) {
         errors.push(`Question type must be one of: ${validTypes.join(', ')}`);
     } else {
