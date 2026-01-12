@@ -198,22 +198,30 @@ const form = await checkops.createForm({
     },
   ],
 });
+
+// The form preserves both questionId (for reference) and id (for submissions)
+console.log(form.questions[0].questionId); // Original bank question ID
+console.log(form.questions[0].id);         // Same as questionId for bank questions
 ```
 
 ### Override Question Properties
 
 ```javascript
+// You can override properties when using questions from the bank
 const form = await checkops.createForm({
   title: 'Custom Form',
   questions: [
     {
       questionId: nameQuestion.id,
-      questionText: 'Your Full Legal Name',
-      required: true,
-      metadata: { customField: 'value' },
+      questionText: 'Your Full Legal Name',  // Override question text
+      required: true,                         // Override required status
+      metadata: { customField: 'value' },    // Add custom metadata
     },
   ],
 });
+
+// Note: Overrides are merged with bank question data (form overrides take precedence)
+// Security: All metadata is sanitized to prevent prototype pollution
 ```
 
 ### Search Questions by Type
@@ -238,12 +246,13 @@ const questions = await checkops.getAllQuestions({
 ### Create Submission
 
 ```javascript
+// Submissions use question IDs (not question text)
 const submission = await checkops.createSubmission({
   formId: form.id,
   submissionData: {
-    'Full Name': 'John Doe',
-    'Email Address': 'john@example.com',
-    'Phone Number': '+1234567890',
+    [nameQuestion.id]: 'John Doe',              // Using question ID
+    [emailQuestion.id]: 'john@example.com',     // Using question ID
+    [phoneQuestion.id]: '+1234567890',          // Using question ID
   },
   metadata: {
     ipAddress: req.ip,
@@ -251,6 +260,21 @@ const submission = await checkops.createSubmission({
     submittedBy: req.user.id,
   },
 });
+
+// For select/multiselect questions, you can use either keys or labels
+const submissionWithOptions = await checkops.createSubmission({
+  formId: form.id,
+  submissionData: {
+    [countryQuestion.id]: 'option_usa',          // Option key (preferred)
+    [colorsQuestion.id]: ['Red', 'Blue'],        // Option labels (auto-converted to keys)
+    [statusQuestion.id]: 'Active'                // Option label (auto-converted to key)
+  },
+});
+
+// Important Notes:
+// - All option labels are sanitized against XSS on write
+// - Multiselect arrays validate that all values are valid options
+// - Both option keys and labels are accepted in submissions
 ```
 
 ### Retrieve Submissions
@@ -580,4 +604,99 @@ const duration = Date.now() - startTime;
 if (duration > 1000) {
   console.warn(`Slow query: ${duration}ms for form ${formId}`);
 }
+```
+
+### 11. Security Best Practices
+
+```javascript
+// ✅ DO: Use question IDs for submissions
+const submission = await checkops.createSubmission({
+  formId: form.id,
+  submissionData: {
+    [questionId]: sanitizedValue  // Using question ID
+  }
+});
+
+// ❌ DON'T: Assume user input is safe
+// CheckOps sanitizes internally, but validate at application level too
+function validateBeforeSubmit(data) {
+  // Your application-specific validation
+  if (!isValidFormat(data.email)) {
+    throw new Error('Invalid email format');
+  }
+  return true;
+}
+
+// ✅ DO: Sanitize metadata objects
+// CheckOps automatically protects against prototype pollution
+const submission = await checkops.createSubmission({
+  formId: form.id,
+  submissionData: data,
+  metadata: userProvidedMetadata  // Automatically sanitized
+});
+
+// ✅ DO: Update option labels safely
+// Uses transactions and row-level locking automatically
+await checkops.updateOptionLabel(
+  questionId,
+  optionKey,
+  newLabel,
+  currentUserId  // Track who made the change
+);
+
+// ✅ DO: Handle validation errors properly
+try {
+  await checkops.createSubmission({ ... });
+} catch (error) {
+  if (error instanceof errors.ValidationError) {
+    // Show user-friendly error message
+    return res.status(400).json({
+      error: 'Please check your input',
+      field: extractFieldFromError(error.message)
+    });
+  }
+  throw error;
+}
+```
+
+### 12. Understanding Automatic Protections
+
+CheckOps provides automatic security protections (as of January 2026):
+
+```javascript
+// Prototype pollution prevention (automatic)
+const question = await checkops.createQuestion({
+  questionText: 'Question',
+  questionType: 'text',
+  metadata: {
+    '__proto__': { polluted: true },  // Automatically removed
+    'safeKey': 'safeValue'            // Preserved
+  }
+});
+
+// XSS prevention in options (automatic)
+const question = await checkops.createQuestion({
+  questionText: 'Select',
+  questionType: 'select',
+  options: [
+    'Safe Option',
+    '<script>alert(1)</script>Bad'  // Automatically sanitized on write
+  ]
+});
+
+// Race condition prevention (automatic)
+// Concurrent option label updates are serialized
+await Promise.all([
+  checkops.updateOptionLabel('Q-1', 'opt_a', 'Label A'),
+  checkops.updateOptionLabel('Q-1', 'opt_a', 'Label B')
+]);
+// One update wins, the other queues - no data corruption
+
+// Multiselect validation (automatic)
+await checkops.createSubmission({
+  formId: form.id,
+  submissionData: {
+    'Q-multiselect': ['Valid', 'Invalid']  // Throws ValidationError
+  }
+});
 ```

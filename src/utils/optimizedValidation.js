@@ -108,6 +108,46 @@ export function validateAndSanitizeQuestion(question) {
     const errors = [];
     const sanitized = {};
 
+    // Bypass validation for question bank references
+    if (question.questionId) {
+        sanitized.questionId = question.questionId;
+
+        // Allow optional overrides
+        if (question.questionText) {
+            sanitized.questionText = validateAndSanitizeString(question.questionText, 'Question text', 1, 1000);
+        }
+        if (question.questionType) {
+            const validTypes = ['text', 'number', 'email', 'select', 'multiselect', 'radio', 'checkbox', 'textarea', 'phone', 'date', 'time', 'datetime', 'boolean', 'file', 'rating'];
+            if (!validTypes.includes(question.questionType)) {
+                errors.push(`Invalid question type: ${question.questionType}`);
+            } else {
+                sanitized.questionType = question.questionType;
+            }
+        }
+        if (question.required !== undefined) {
+            sanitized.required = Boolean(question.required);
+        }
+        if (question.options) {
+            try {
+                sanitized.options = validateAndSanitizeOptions(question.options);
+            } catch (error) {
+                errors.push(error.message);
+            }
+        }
+        if (question.validationRules) {
+            sanitized.validationRules = sanitizeObject(question.validationRules);
+        }
+        if (question.metadata) {
+            sanitized.metadata = sanitizeObject(question.metadata);
+        }
+
+        if (errors.length > 0) {
+            throw new ValidationError(errors.join(', '));
+        }
+        return sanitized;
+    }
+
+    // Full validation for new questions (existing logic)
     // Validate and sanitize question text
     try {
         sanitized.questionText = validateAndSanitizeString(
@@ -121,7 +161,7 @@ export function validateAndSanitizeQuestion(question) {
     }
 
     // Validate question type
-    const validTypes = ['text', 'number', 'email', 'select', 'multiselect', 'radio', 'checkbox', 'textarea'];
+    const validTypes = ['text', 'number', 'email', 'select', 'multiselect', 'radio', 'checkbox', 'textarea', 'phone', 'date', 'time', 'datetime', 'boolean', 'file', 'rating'];
     if (!question.questionType || !validTypes.includes(question.questionType)) {
         errors.push(`Question type must be one of: ${validTypes.join(', ')}`);
     } else {
@@ -234,24 +274,35 @@ export function validateAndSanitizeSubmissionData(submissionData, questions) {
 
     // Create a map of questions for efficient lookup
     const questionMap = new Map();
+    const validQuestionIds = new Set();
+
     questions.forEach(question => {
-        const questionId = question.questionId || question.id;
-        questionMap.set(questionId, question);
+        // Support both questionId (bank reference) and id (direct)
+        if (question.questionId) {
+            questionMap.set(question.questionId, question);
+            validQuestionIds.add(question.questionId);
+        }
+        if (question.id) {
+            questionMap.set(question.id, question);
+            validQuestionIds.add(question.id);
+        }
     });
 
     // Validate each answer
-    for (const [questionId, answer] of Object.entries(submissionData)) {
-        const question = questionMap.get(questionId);
-
-        if (!question) {
-            errors.push(`Unknown question ID: ${questionId}`);
+    for (const [key, value] of Object.entries(submissionData)) {
+        if (!validQuestionIds.has(key)) {
+            errors.push(`Unknown question ID: ${key}`);
             continue;
         }
 
-        try {
-            sanitized[questionId] = validateAndSanitizeAnswer(answer, question);
-        } catch (error) {
-            errors.push(`Question "${question.questionText}": ${error.message}`);
+        const question = questionMap.get(key);
+
+        if (question) {
+            try {
+                sanitized[key] = validateAndSanitizeAnswer(value, question);
+            } catch (error) {
+                errors.push(`Question "${question.questionText}": ${error.message}`);
+            }
         }
     }
 
@@ -321,6 +372,13 @@ export function validateAndSanitizeAnswer(answer, question) {
             }
             // Convert each answer to key if it's a valid label or key
             const convertedAnswers = OptionUtils.convertToKeys(answer, question.options);
+            // Validate all converted answers are valid option keys
+            const validKeys = new Set(question.options.map(opt => opt.key));
+            for (const converted of convertedAnswers) {
+                if (!validKeys.has(converted)) {
+                    throw new ValidationError('Answer must be a valid option');
+                }
+            }
             return convertedAnswers;
 
         default:

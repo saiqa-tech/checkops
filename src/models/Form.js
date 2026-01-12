@@ -47,19 +47,37 @@ export class Form {
     // OPTIMIZATION: Simple operations don't need explicit transactions
     // PostgreSQL handles single statements atomically
     const id = await generateFormId();
+    const enhancedMetadata = Form.buildEnhancedMetadata(questions, metadata);
 
     try {
       const result = await pool.query(
         `INSERT INTO forms (id, title, description, questions, metadata, is_active)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [id, title, description, JSON.stringify(questions), JSON.stringify(metadata), true]
+        [id, title, description, JSON.stringify(questions), JSON.stringify(enhancedMetadata), true]
       );
 
       return Form.fromRow(result.rows[0]);
     } catch (error) {
       throw new DatabaseError('Failed to create form', error);
     }
+  }
+
+  static buildEnhancedMetadata(questions, metadata = {}) {
+    // Preserve question bank relationships in metadata
+    const questionBankMapping = {};
+    questions.forEach((question, index) => {
+      if (question.questionId) {
+        questionBankMapping[`question_${index}`] = question.questionId;
+      }
+    });
+
+    return {
+      ...metadata,
+      _questionBankMapping: questionBankMapping,
+      _createdAt: new Date().toISOString(),
+      _version: '3.0.0'
+    };
   }
 
   static async findById(id) {
@@ -196,6 +214,7 @@ export class Form {
 
       formsData.forEach((formData, index) => {
         const id = ids[index];
+        const enhancedMetadata = Form.buildEnhancedMetadata(formData.questions, formData.metadata);
         placeholders.push(
           `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5})`
         );
@@ -204,7 +223,7 @@ export class Form {
           formData.title,
           formData.description || '',
           JSON.stringify(formData.questions),
-          JSON.stringify(formData.metadata || {}),
+          JSON.stringify(enhancedMetadata),
           true
         );
         paramIndex += 6;

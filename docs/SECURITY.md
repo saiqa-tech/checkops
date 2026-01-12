@@ -630,3 +630,132 @@ If you discover a security vulnerability, please email security@saiqa.tech with:
 - Suggested fix (if any)
 
 **Please do not** open public GitHub issues for security vulnerabilities.
+
+---
+
+## Recent Security Enhancements (January 2026)
+
+CheckOps v3.0.0+ includes comprehensive security hardening applied on January 11, 2026:
+
+### Prototype Pollution Prevention
+
+All user input objects (metadata, options, submission data) are now protected against prototype pollution attacks:
+
+```javascript
+// Dangerous keys are automatically filtered (case-insensitive)
+const BLOCKED_KEYS = ['__proto__', 'prototype', 'constructor'];
+
+// Example: Malicious input is safely handled
+const maliciousMetadata = {
+  normalKey: 'safe',
+  '__proto__': { polluted: true }, // Automatically removed
+  'PROTOTYPE': { bad: true }        // Automatically removed
+};
+
+// After sanitization, only safe keys remain
+const safe = sanitizeObject(maliciousMetadata);
+// Result: { normalKey: 'safe' }
+```
+
+**Protections:**
+- Recursive object/array sanitization
+- Case-insensitive key filtering
+- Nested object protection
+- Preserved data integrity for legitimate keys
+
+### XSS Prevention in Options
+
+All option labels and metadata are sanitized on write to prevent stored XSS attacks:
+
+```javascript
+// Malicious option labels are sanitized automatically
+await checkops.createQuestion({
+  questionText: 'Select option',
+  questionType: 'select',
+  options: [
+    'Safe Option',
+    '<script>alert("XSS")</script>Malicious', // Sanitized on write
+    'javascript:alert("XSS")',                 // Sanitized on write
+    '<img src=x onerror=alert("XSS")>'        // Sanitized on write
+  ],
+});
+
+// Option metadata is also sanitized
+await checkops.createQuestion({
+  options: [{
+    key: 'opt1',
+    label: 'Option 1',
+    metadata: {
+      description: '<script>bad</script>' // Sanitized on write
+    }
+  }]
+});
+```
+
+**Protections:**
+- HTML tag removal (`<script>`, `<img>`, etc.)
+- JavaScript protocol removal (`javascript:`, `data:`)
+- Event handler removal (`onclick=`, `onerror=`, etc.)
+- Applied at ingestion (write time) for consistent protection
+
+### Race Condition Prevention
+
+Option label updates use row-level locking to prevent concurrent modification issues:
+
+```javascript
+// Multiple concurrent updates are serialized
+await Promise.all([
+  checkops.updateOptionLabel('Q-001', 'opt_a', 'New Label A', 'user-1'),
+  checkops.updateOptionLabel('Q-001', 'opt_a', 'New Label B', 'user-2')
+]);
+
+// Implementation uses SELECT FOR UPDATE with transactions
+// - Prevents lost updates
+// - Ensures consistent option history
+// - Maintains data integrity under concurrent load
+```
+
+### Cache Memory Leak Fix
+
+Query cache now properly cleans up dependency tracking to prevent memory growth:
+
+```javascript
+// Cache dependencies are automatically cleaned when entries expire
+// - Prevents unbounded memory growth
+// - Maintains cache efficiency
+// - No manual cleanup required
+```
+
+### Multiselect Validation Hardening
+
+Multiselect submissions now validate that all array values are valid options:
+
+```javascript
+// Invalid options are rejected
+await checkops.createSubmission({
+  formId: 'FORM-001',
+  submissionData: {
+    'Q-multiselect': ['Valid Option', 'Invalid Option'] // Throws ValidationError
+  }
+});
+
+// Both keys and labels are accepted, but must be valid
+await checkops.createSubmission({
+  formId: 'FORM-001',
+  submissionData: {
+    'Q-multiselect': ['option_key_1', 'Option Label 2'] // OK if both valid
+  }
+});
+```
+
+### Regression Test Coverage
+
+All security fixes include comprehensive regression test coverage (30+ test cases):
+
+- Prototype pollution prevention (7 tests)
+- XSS prevention in options (6 tests)
+- Sanitization edge cases (5 tests)
+- Combined attack scenarios (4 tests)
+- Over-sanitization checks (3 tests)
+
+**Test Location:** `tests/unit/security-fixes.test.js`

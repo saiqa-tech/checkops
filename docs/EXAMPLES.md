@@ -92,9 +92,14 @@ app.post('/api/forms/:id/submit', async (req, res) => {
   try {
     const { submissionData } = req.body;
 
+    // Validate input data
+    if (!submissionData || typeof submissionData !== 'object') {
+      return res.status(400).json({ error: 'Invalid submission data' });
+    }
+
     const submission = await checkops.createSubmission({
       formId: req.params.id,
-      submissionData,
+      submissionData, // Should use question IDs as keys, not question text
       metadata: {
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
@@ -107,7 +112,7 @@ app.post('/api/forms/:id/submit', async (req, res) => {
     if (error instanceof errors.ValidationError) {
       res.status(400).json({
         error: 'Validation failed',
-        details: error.details,
+        details: error.message, // Now includes detailed validation messages
       });
     } else if (error instanceof errors.NotFoundError) {
       res.status(404).json({ error: 'Form not found' });
@@ -116,6 +121,16 @@ app.post('/api/forms/:id/submit', async (req, res) => {
     }
   }
 });
+
+// Important: Submission data should use question IDs
+// Example valid submission:
+// {
+//   "submissionData": {
+//     "Q-001": "John Doe",              // Question ID from bank
+//     "Q-002": "john@example.com",      // Question ID from bank
+//     "Q-003": "option_usa"             // Option key (or label also accepted)
+//   }
+// }
 
 // GET: Get form submissions
 app.get('/api/forms/:id/submissions', async (req, res) => {
@@ -642,6 +657,49 @@ app.post('/api/form-builder/save', async (req, res) => {
     res.status(201).json({ form });
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// Update option label with proper transaction handling
+app.patch('/api/questions/:questionId/options/:optionKey/label', async (req, res) => {
+  try {
+    const { questionId, optionKey } = req.params;
+    const { newLabel } = req.body;
+
+    // UpdateOptionLabel uses:
+    // - SELECT FOR UPDATE for row-level locking
+    // - Transaction to ensure history is recorded atomically
+    // - Automatic stats cache invalidation for affected forms
+    const updatedQuestion = await checkops.updateOptionLabel(
+      questionId,
+      optionKey,
+      newLabel,
+      req.user.id  // Track who made the change
+    );
+
+    res.json({ question: updatedQuestion });
+  } catch (error) {
+    if (error instanceof errors.ValidationError) {
+      res.status(400).json({ error: error.message });
+    } else if (error instanceof errors.NotFoundError) {
+      res.status(404).json({ error: 'Question or option not found' });
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+// Get option change history
+app.get('/api/questions/:questionId/options/history', async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const { optionKey } = req.query;
+
+    const history = await checkops.getOptionHistory(questionId, optionKey);
+
+    res.json({ history });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 ```

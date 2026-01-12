@@ -1,3 +1,5 @@
+const PROTOTYPE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
 export function sanitizeString(input) {
   if (input === null || input === undefined) {
     return '';
@@ -66,14 +68,37 @@ export function sanitizeObject(obj) {
 
   const sanitized = {};
   for (const [key, value] of Object.entries(obj)) {
-    const sanitizedKey = sanitizeString(key);
-    if (typeof value === 'string') {
-      sanitized[sanitizedKey] = sanitizeString(value);
-    } else if (typeof value === 'object') {
-      sanitized[sanitizedKey] = sanitizeObject(value);
-    } else {
-      sanitized[sanitizedKey] = value;
+    const baseKey = typeof key === 'string' ? key : String(key);
+    const normalizedKey = baseKey.toLowerCase();
+    if (PROTOTYPE_KEYS.has(normalizedKey)) {
+      continue;
     }
+
+    const sanitizedKey = sanitizeString(baseKey);
+    if (!sanitizedKey) {
+      continue;
+    }
+
+    let sanitizedValue;
+    if (typeof value === 'string') {
+      sanitizedValue = sanitizeString(value);
+    } else if (Array.isArray(value)) {
+      sanitizedValue = value.map((item) => {
+        if (typeof item === 'string') {
+          return sanitizeString(item);
+        }
+        if (typeof item === 'object') {
+          return sanitizeObject(item);
+        }
+        return item;
+      });
+    } else if (value !== null && typeof value === 'object') {
+      sanitizedValue = sanitizeObject(value);
+    } else {
+      sanitizedValue = value;
+    }
+
+    sanitized[sanitizedKey] = sanitizedValue;
   }
 
   return sanitized;

@@ -1,9 +1,10 @@
 import { Question } from '../models/Question.js';
 import { validateRequired, validateString, validateQuestionType } from '../utils/validation.js';
 import { sanitizeString, sanitizeObject } from '../utils/sanitization.js';
-import { ValidationError } from '../utils/errors.js';
+import { ValidationError, NotFoundError } from '../utils/errors.js';
 import { OptionUtils } from '../utils/optionUtils.js';
 import { getPool } from '../config/database.js';
+import { checkOpsCache } from '../utils/cache.js';
 
 export class QuestionService {
   async createQuestion({ questionText, questionType, options = null, validationRules = null, metadata = {} }) {
@@ -133,32 +134,86 @@ export class QuestionService {
     validateRequired(newLabel, 'New label');
     validateString(newLabel, 'New label', 1, 500);
 
-    const question = await Question.findById(questionId);
+    const pool = getPool();
+    const client = await pool.connect();
 
-    if (!question.options || !Array.isArray(question.options)) {
-      throw new ValidationError('Question does not have options');
+    try {
+      await client.query('BEGIN');
+
+      const questionResult = await client.query(
+        'SELECT * FROM question_bank WHERE id = $1 FOR UPDATE',
+        [questionId]
+      );
+
+      if (questionResult.rows.length === 0) {
+        throw new NotFoundError('Question', questionId);
+      }
+
+      const question = Question.fromRow(questionResult.rows[0]);
+
+      if (!question.options || !Array.isArray(question.options)) {
+        throw new ValidationError('Question does not have options');
+      }
+
+      const optionIndex = question.options.findIndex((opt) => opt.key === optionKey);
+      if (optionIndex === -1) {
+        throw new ValidationError(`Option with key '${optionKey}' not found`);
+      }
+
+      const oldLabel = question.options[optionIndex].label;
+
+      if (oldLabel === newLabel) {
+        await client.query('COMMIT');
+        return question;
+      }
+
+      const sanitizedLabel = sanitizeString(newLabel);
+      const updatedOptions = [...question.options];
+      updatedOptions[optionIndex] = {
+        ...updatedOptions[optionIndex],
+        label: sanitizedLabel,
+      };
+
+      const updatedQuestionResult = await client.query(
+        `UPDATE question_bank
+         SET options = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2
+         RETURNING *`,
+        [JSON.stringify(updatedOptions), questionId]
+      );
+
+      await this._recordOptionLabelChange(
+        questionId,
+        optionKey,
+        oldLabel,
+        sanitizedLabel,
+        changedBy,
+        client
+      );
+
+      await client.query('COMMIT');
+
+      // After successful update, invalidate stats cache for all forms using this question
+      // Forms store questions as JSONB array, so we query to find matching forms
+      const formsResult = await pool.query(
+        `SELECT id, questions FROM forms WHERE questions IS NOT NULL`
+      );
+
+      formsResult.rows.forEach(row => {
+        const questions = Array.isArray(row.questions) ? row.questions : [];
+        const usesThisQuestion = questions.some(q => q.questionId === questionId);
+        if (usesThisQuestion) {
+          checkOpsCache.deleteStats(row.id);
+        }
+      });
+
+      return Question.fromRow(updatedQuestionResult.rows[0]);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const optionIndex = question.options.findIndex((opt) => opt.key === optionKey);
-    if (optionIndex === -1) {
-      throw new ValidationError(`Option with key '${optionKey}' not found`);
-    }
-
-    const oldLabel = question.options[optionIndex].label;
-
-    if (oldLabel === newLabel) {
-      return question;
-    }
-
-    const updatedOptions = [...question.options];
-    updatedOptions[optionIndex] = {
-      ...updatedOptions[optionIndex],
-      label: sanitizeString(newLabel),
-    };
-
-    await this._recordOptionLabelChange(questionId, optionKey, oldLabel, newLabel, changedBy);
-
-    return await Question.update(questionId, { options: updatedOptions });
   }
 
   async getOptionHistory(questionId, optionKey = null) {
@@ -193,9 +248,9 @@ export class QuestionService {
     }));
   }
 
-  async _recordOptionLabelChange(questionId, optionKey, oldLabel, newLabel, changedBy = null) {
-    const pool = getPool();
-    await pool.query(
+  async _recordOptionLabelChange(questionId, optionKey, oldLabel, newLabel, changedBy = null, client = null) {
+    const runner = client || getPool();
+    await runner.query(
       `INSERT INTO question_option_history (question_id, option_key, old_label, new_label, changed_by)
        VALUES ($1, $2, $3, $4, $5)`,
       [questionId, optionKey, oldLabel, newLabel, changedBy]
