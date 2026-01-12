@@ -249,6 +249,19 @@ const question = await checkops.createQuestion({
   options: ['USA', 'Canada', 'UK', 'Australia'],
   metadata: { category: 'demographics' },
 });
+
+// Options with structured format (recommended for complex cases)
+const questionWithStructuredOptions = await checkops.createQuestion({
+  questionText: 'Select priority',
+  questionType: 'select',
+  options: [
+    { key: 'priority_high', label: 'High Priority', metadata: { color: 'red' } },
+    { key: 'priority_low', label: 'Low Priority', metadata: { color: 'green' } }
+  ],
+});
+
+// Security Note: Option labels and metadata are automatically sanitized
+// to prevent XSS attacks and prototype pollution
 ```
 
 ### getQuestion()
@@ -312,6 +325,40 @@ Updates an existing question.
 
 **Returns:** `Promise<Question>` - Updated question object
 
+### updateOptionLabel()
+
+```javascript
+await checkops.updateOptionLabel(questionId, optionKey, newLabel, changedBy)
+```
+
+Updates a single option label with full transaction safety and history tracking.
+
+**Parameters:**
+
+- `questionId` (String, required) - Question ID
+- `optionKey` (String, required) - Option key to update
+- `newLabel` (String, required) - New label text (1-500 characters)
+- `changedBy` (String, optional) - User ID who made the change
+
+**Returns:** `Promise<Question>` - Updated question object
+
+**Important Notes:**
+- Uses row-level locking (SELECT FOR UPDATE) to prevent race conditions
+- Automatically invalidates stats cache for all forms using this question
+- Records change in option history for audit purposes
+- Maintains key immutability (only label changes)
+
+**Example:**
+
+```javascript
+await checkops.updateOptionLabel(
+  'Q-001',
+  'priority_high',
+  'Critical Priority',
+  'user-123'
+);
+```
+
 ### deleteQuestion()
 
 ```javascript
@@ -348,17 +395,31 @@ Creates a new form submission.
 **Example:**
 
 ```javascript
+// Submissions use question IDs (from question bank or form questions)
 const submission = await checkops.createSubmission({
   formId: 'FORM-001',
   submissionData: {
-    'Full Name': 'John Doe',
-    'Email Address': 'john@example.com',
+    'Q-001': 'John Doe',        // Question ID from question bank
+    'Q-002': 'john@example.com', // Question ID from question bank
   },
   metadata: {
     ipAddress: '192.168.1.1',
     userAgent: 'Mozilla/5.0...',
   },
 });
+
+// For select/multiselect questions, use option keys OR labels (both accepted)
+const submissionWithOptions = await checkops.createSubmission({
+  formId: 'FORM-001',
+  submissionData: {
+    'Q-003': 'option_red',           // Option key (preferred)
+    'Q-004': ['Red', 'Blue'],        // Option labels (converted to keys)
+    'Q-005': ['option_a', 'option_b'] // Option keys for multiselect
+  },
+});
+
+// Note: All option labels are sanitized against XSS on write
+// Multiselect validation ensures all values are valid option keys/labels
 ```
 
 ### getSubmission()

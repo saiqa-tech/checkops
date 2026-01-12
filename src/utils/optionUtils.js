@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { ValidationError } from './errors.js';
+import { sanitizeString, sanitizeObject } from './sanitization.js';
 
 export class OptionUtils {
   static processOptions(options, questionId) {
@@ -18,14 +19,17 @@ export class OptionUtils {
     const isSimpleArray = options.every((opt) => typeof opt === 'string');
 
     if (isSimpleArray) {
-      return options.map((label, index) => ({
-        key: this.generateOptionKey(label, index, questionId),
-        label: label,
-        order: index + 1,
-        metadata: {},
-        disabled: false,
-        createdAt: new Date().toISOString(),
-      }));
+      return options.map((label, index) => {
+        const sanitizedLabel = sanitizeString(label);
+        return {
+          key: this.generateOptionKey(label, index, questionId),
+          label: sanitizedLabel,
+          order: index + 1,
+          metadata: {},
+          disabled: false,
+          createdAt: new Date().toISOString(),
+        };
+      });
     }
 
     const isStructuredArray = options.every(
@@ -46,9 +50,9 @@ export class OptionUtils {
 
     return options.map((opt, index) => ({
       key: this.sanitizeOptionKey(opt.key),
-      label: opt.label,
+      label: sanitizeString(opt.label),
       order: opt.order !== undefined ? opt.order : index + 1,
-      metadata: opt.metadata || {},
+      metadata: opt.metadata ? sanitizeObject(opt.metadata) : {},
       disabled: opt.disabled || false,
       createdAt: opt.createdAt || new Date().toISOString(),
     }));
@@ -134,12 +138,12 @@ export class OptionUtils {
     if (Array.isArray(answer)) {
       return answer.map((value) => {
         const option = options.find((opt) => opt.key === value);
-        return option ? option.label : value;
+        return option ? option.label : sanitizeString(value);
       });
     }
 
     const option = options.find((opt) => opt.key === answer);
-    return option ? option.label : answer;
+    return option ? option.label : sanitizeString(answer);
   }
 
   static requiresOptions(questionType) {

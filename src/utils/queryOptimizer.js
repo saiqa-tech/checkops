@@ -6,14 +6,24 @@
 import { getPool } from '../config/database.js';
 
 // Add identifier validation for SQL injection prevention
-const IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+// Supports simple identifiers (column_name) and qualified identifiers (table.column)
+const SIMPLE_IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const QUALIFIED_IDENTIFIER_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$/;
+const WILDCARD_REGEX = /^\*$/;
 
 function validateIdentifier(identifier, name = 'identifier') {
     if (!identifier || typeof identifier !== 'string') {
         throw new Error(`Invalid ${name}: must be a non-empty string`);
     }
-    if (!IDENTIFIER_REGEX.test(identifier)) {
-        throw new Error(`Invalid ${name}: contains illegal characters`);
+
+    // Allow wildcard for SELECT *
+    if (WILDCARD_REGEX.test(identifier)) {
+        return identifier;
+    }
+
+    // Allow simple identifiers (column) or qualified identifiers (table.column)
+    if (!SIMPLE_IDENTIFIER_REGEX.test(identifier) && !QUALIFIED_IDENTIFIER_REGEX.test(identifier)) {
+        throw new Error(`Invalid ${name}: must be a valid SQL identifier (alphanumeric, underscore, optionally qualified with table name)`);
     }
     return identifier;
 }
@@ -297,6 +307,7 @@ export class QueryCache {
         // Check if cache is still valid (5 minutes TTL)
         if (Date.now() - cached.timestamp > 300000) {
             this.cache.delete(key);
+            this._removeKeyFromDependencies(key);
             return null;
         }
 
@@ -316,6 +327,15 @@ export class QueryCache {
     clear() {
         this.cache.clear();
         this.dependencies.clear();
+    }
+
+    _removeKeyFromDependencies(key) {
+        // Ensure dependency sets stay in sync with cache contents
+        this.dependencies.forEach((queryKeys, table) => {
+            if (queryKeys.delete(key) && queryKeys.size === 0) {
+                this.dependencies.delete(table);
+            }
+        });
     }
 
     getStats() {

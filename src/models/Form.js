@@ -48,12 +48,27 @@ export class Form {
     // PostgreSQL handles single statements atomically
     const id = await generateFormId();
 
+    // Preserve question bank relationships in metadata
+    const questionBankMapping = {};
+    questions.forEach((question, index) => {
+      if (question.questionId) {
+        questionBankMapping[`question_${index}`] = question.questionId;
+      }
+    });
+
+    const enhancedMetadata = {
+      ...metadata,
+      _questionBankMapping: questionBankMapping,
+      _createdAt: new Date().toISOString(),
+      _version: '3.0.0'
+    };
+
     try {
       const result = await pool.query(
         `INSERT INTO forms (id, title, description, questions, metadata, is_active)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [id, title, description, JSON.stringify(questions), JSON.stringify(metadata), true]
+        [id, title, description, JSON.stringify(questions), JSON.stringify(enhancedMetadata), true]
       );
 
       return Form.fromRow(result.rows[0]);

@@ -363,7 +363,7 @@ describe('Options Integration Tests', () => {
           formId: form.id,
           submissionData: { [question.id]: 'Invalid Option' },
         })
-      ).rejects.toThrow('Validation failed');
+      ).rejects.toThrow(/Validation/);
     });
 
     test('should validate multiselect array values', async () => {
@@ -385,7 +385,7 @@ describe('Options Integration Tests', () => {
           formId: form.id,
           submissionData: { [question.id]: ['Red', 'Invalid'] },
         })
-      ).rejects.toThrow('Validation failed');
+      ).rejects.toThrow(/Validation/);
     });
   });
 

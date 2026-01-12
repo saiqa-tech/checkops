@@ -241,21 +241,57 @@ class Submission {
    ↓
 6. Validate submission data against form rules
    ↓
-7. Sanitize submission data
+7. Sanitize submission data (XSS prevention)
    ↓
-8. Submission.create() called
+8. Convert option labels to keys if needed
    ↓
-9. Database transaction begins
+9. Validate multiselect arrays (all values must be valid)
    ↓
-10. Verify form exists (foreign key)
+10. Submission.create() called
    ↓
-11. Generate human-readable ID
+11. Database transaction begins
    ↓
-12. Insert submission into database
+12. Verify form exists (foreign key)
    ↓
-13. Transaction commits
+13. Generate human-readable ID
    ↓
-14. Return Submission object
+14. Insert submission into database
+   ↓
+15. Transaction commits
+   ↓
+16. Invalidate stats cache for this form
+   ↓
+17. Return Submission object
+```
+
+### Updating Option Labels
+
+```
+1. Application calls checkops.updateOptionLabel()
+   ↓
+2. SDK validates initialization
+   ↓
+3. QuestionService receives request
+   ↓
+4. Begin database transaction
+   ↓
+5. SELECT ... FOR UPDATE (row-level lock)
+   ↓
+6. Validate option exists
+   ↓
+7. Sanitize new label (XSS prevention)
+   ↓
+8. Update question options in database
+   ↓
+9. Record change in option_history table (within transaction)
+   ↓
+10. Commit transaction
+   ↓
+11. Query all forms using this question
+   ↓
+12. Invalidate stats cache for ALL affected forms
+   ↓
+13. Return updated Question object
 ```
 
 ## Design Patterns
@@ -396,7 +432,45 @@ await client.query('BEGIN');
 await client.query('COMMIT');
 ```
 
-### 5. Pagination
+### 5. Query Cache with Dependency Tracking
+
+CheckOps implements an intelligent query cache with automatic dependency management:
+
+```javascript
+// Cache entries track their table dependencies
+queryCache.set('forms:all', result, ['forms']);
+
+// Cache invalidation on mutations
+queryCache.invalidateTable('forms'); // Clears all forms-related queries
+
+// Memory leak prevention (added 2026-01-11)
+// Dependencies are automatically cleaned when cache entries expire
+// Prevents unbounded growth of the dependencies Map
+```
+
+**Cache Architecture:**
+- LRU eviction with TTL support
+- Table-level dependency tracking
+- Automatic cleanup of expired dependencies
+- Configurable cache size and TTL per data type
+
+### 6. Stats Cache Invalidation
+
+Submission statistics are cached with intelligent invalidation:
+
+```javascript
+// Stats cached for 3 minutes by default
+const stats = await checkops.getSubmissionStats(formId);
+
+// Automatic cache invalidation on relevant operations:
+// - New submission created → stats cache cleared for that form
+// - Option label updated → stats cache cleared for ALL forms using that question
+// - Form questions updated → stats cache cleared for that form
+
+// This ensures stats always reflect current labels and data
+```
+
+### 7. Pagination
 
 ```javascript
 await Form.findAll({

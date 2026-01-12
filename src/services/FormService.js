@@ -100,12 +100,13 @@ export class FormService {
 
       // Merge question data with bank question data
       return {
-        questionId: bankQuestion.id,
+        questionId: question.questionId, // Preserve original reference
+        id: bankQuestion.id, // Bank question ID
         questionText: question.questionText || bankQuestion.questionText,
         questionType: question.questionType || bankQuestion.questionType,
         options: question.options || bankQuestion.options,
         validationRules: question.validationRules || bankQuestion.validationRules,
-        required: question.required || false,
+        required: question.required !== undefined ? question.required : false,
         metadata: { ...bankQuestion.metadata, ...question.metadata },
       };
     });
