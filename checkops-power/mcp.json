@@ -4,8 +4,8 @@
             "command": "npx",
             "args": [
                 "--yes",
-                "@saiqa-tech/checkops@latest",
-                "mcp-server"
+                "--package=@saiqa-tech/checkops@latest",
+                "checkops-mcp-server"
             ],
             "env": {
                 "NODE_ENV": "development",
@@ -15,7 +15,7 @@
                 "DB_USER": "${DB_USER}",
                 "DB_PASSWORD": "${DB_PASSWORD}"
             },
-            "disabled": true,
+            "disabled": false,
             "autoApprove": []
         }
     }

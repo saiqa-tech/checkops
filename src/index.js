@@ -6,6 +6,7 @@ import * as errors from './utils/errors.js';
 import { metricsCollector, performanceMonitor } from './utils/metrics.js';
 import { productionMetrics, metricsMiddleware, getHealthCheckData } from './utils/productionMetrics.js';
 import { withMonitoring, withModelMonitoring, recordBatchOperation } from './utils/monitoringWrapper.js';
+import { checkOpsCache } from './utils/cache.js';
 
 export class CheckOps {
   constructor(config = {}) {
@@ -192,6 +193,59 @@ export class CheckOps {
   async getOptionHistory(questionId, optionKey = null) {
     this.ensureInitialized();
     return await this.questionService.getOptionHistory(questionId, optionKey);
+  }
+
+  // Cache management methods for v3.0.0 MCP server
+  getCacheStats() {
+    this.ensureInitialized();
+    return checkOpsCache.getCacheStats();
+  }
+
+  async clearCache(type = 'all', id = null) {
+    this.ensureInitialized();
+
+    if (type === 'all') {
+      checkOpsCache.clear();
+      return { message: 'All caches cleared successfully' };
+    }
+
+    // Clear specific cache types
+    switch (type) {
+      case 'form':
+        if (id) {
+          checkOpsCache.formCache.delete(id);
+          return { message: `Form cache cleared for ID: ${id}` };
+        } else {
+          checkOpsCache.formCache.clear();
+          return { message: 'All form caches cleared' };
+        }
+      case 'question':
+        if (id) {
+          checkOpsCache.questionCache.delete(id);
+          return { message: `Question cache cleared for ID: ${id}` };
+        } else {
+          checkOpsCache.questionCache.clear();
+          return { message: 'All question caches cleared' };
+        }
+      case 'stats':
+        if (id) {
+          checkOpsCache.statsCache.delete(id);
+          return { message: `Stats cache cleared for ID: ${id}` };
+        } else {
+          checkOpsCache.statsCache.clear();
+          return { message: 'All stats caches cleared' };
+        }
+      case 'submission':
+        if (id) {
+          checkOpsCache.submissionCache.delete(id);
+          return { message: `Submission cache cleared for ID: ${id}` };
+        } else {
+          checkOpsCache.submissionCache.clear();
+          return { message: 'All submission caches cleared' };
+        }
+      default:
+        throw new Error(`Unknown cache type: ${type}`);
+    }
   }
 }
 
