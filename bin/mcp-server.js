@@ -38,9 +38,12 @@ class CheckOpsMCPServer {
         try {
             // Environment variables are passed from MCP client configuration
             // Defaults are provided here for missing values
+            const parsedPort = parseInt(process.env.DB_PORT, 10);
+            const port = Number.isNaN(parsedPort) ? 5432 : parsedPort;
+
             this.checkops = new CheckOps({
                 host: process.env.DB_HOST || 'localhost',
-                port: parseInt(process.env.DB_PORT) || 5432,
+                port: port,
                 database: process.env.DB_NAME,
                 user: process.env.DB_USER,
                 password: process.env.DB_PASSWORD,
