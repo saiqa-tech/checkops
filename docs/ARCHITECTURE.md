@@ -42,7 +42,7 @@ CheckOps is a **layered architecture** npm package designed for building dynamic
                       ▼
 ┌─────────────────────────────────────────────────┐
 │          Database Layer                          │
-│       (PostgreSQL 18 + JSONB)                    │
+│       (PostgreSQL 12+, 18 recommended)           │
 └─────────────────────────────────────────────────┘
 ```
 

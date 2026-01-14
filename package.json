@@ -1,11 +1,14 @@
 {
   "name": "@saiqa-tech/checkops",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "A high-performance, production-ready Node.js package for creating dynamic forms with advanced optimizations, real-time monitoring, centralized question reusability, and enterprise-grade performance capabilities",
   "main": "src/index.js",
   "type": "module",
+  "bin": {
+    "checkops-mcp-server": "./bin/mcp-server.js"
+  },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=18.0.0"
   },
   "scripts": {
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
@@ -52,8 +55,12 @@
     "url": "https://github.com/saiqa-tech/checkops/issues"
   },
   "homepage": "https://github.com/saiqa-tech/checkops#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2"
+  },
   "peerDependencies": {
-    "pg": "^8.11.0"
+    "pg": "^8.11.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "eslint": "^8.57.0",
@@ -64,6 +71,7 @@
   },
   "files": [
     "src",
+    "bin",
     "migrations",
     "docs",
     "README.md",

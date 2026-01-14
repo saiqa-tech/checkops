@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-01-14
+
+### Added
+- **Comprehensive Documentation Suite** - Production-ready documentation for all audiences
+  - Non-Technical Overview - Beginner-friendly guide for stakeholders and non-developers
+  - Performance Monitoring Guide - Complete guide for v3.0.0 monitoring features
+  - Batch Operations Guide - High-performance bulk operations with examples
+  - Migration Guide - Step-by-step migration between all versions
+  - FAQ - 50+ frequently asked questions with practical solutions
+  - Documentation Index - Complete navigation guide for all documentation
+- **Enhanced API Documentation** - Complete v3.0.0 feature coverage
+  - Performance monitoring APIs (metricsCollector, productionMetrics)
+  - Batch operation methods (bulkCreateForms, bulkCreateQuestions, bulkCreateSubmissions)
+  - Cache management APIs (getCacheStats, clearCache)
+  - MCP server integration documentation
+  - Monitoring wrappers (withMonitoring, recordBatchOperation)
+  - Health check endpoints (getHealthCheckData)
+
+### Fixed
+- **MCP Server Improvements** - CodeRabbit review issues resolved
+  - Fixed switch case variable hoisting in 4 methods (setupToolHandlers, handleMonitoringTools, handleBatchOperations, handleCacheOperations)
+  - Fixed port parsing with explicit radix (parseInt with base 10)
+  - Removed shell-style environment variable syntax from mcp.json
+  - Updated MCP SDK version references to 1.25.2
+  - Fixed tool count in documentation (17 tools)
+- **Documentation Consistency** - PostgreSQL version requirements
+  - Standardized minimum requirement: PostgreSQL 12+
+  - Standardized recommended version: PostgreSQL 18
+  - Fixed all inconsistencies across 10+ documentation files
+  - Clarified JSONB support (available since PostgreSQL 9.4)
+- **Node.js Requirements** - Corrected version specifications
+  - Minimum: Node.js 18+
+  - Recommended: Node.js 20+
+  - Fixed inconsistencies in CONTRIBUTING.md and Power documentation
+
+### Documentation
+- 6 new comprehensive guides (15,000+ words)
+- 200+ working code examples
+- Complete v3.0.0 feature documentation
+- Improved navigation and discoverability
+- Better organization for different audiences (technical, non-technical, DevOps)
+
+### Notes
+- **No breaking changes** - Fully backward compatible with v3.0.0
+- **No code changes** - This is a documentation and bug fix release
+- **Migration required:** None - drop-in replacement
+- All 157 unit tests continue to pass
+
 ## [2.1.0] - 2025-01-28
 
 ### Added
@@ -215,7 +263,7 @@ await checkops.createSubmission({
 - Form builder with dynamic question support
 - Centralized question bank for reusability
 - Structured data submission with validation
-- PostgreSQL 18 with JSONB support
+- PostgreSQL 12+ with JSONB support (PostgreSQL 18 recommended)
 - Human-readable ID generation (FORM-001, Q-001, SUB-001)
 
 #### Question Types
@@ -273,7 +321,7 @@ await checkops.createSubmission({
 - Custom error classes with safe error messages
 
 #### Database Features
-- PostgreSQL 18 support
+- PostgreSQL 12+ support (PostgreSQL 18 recommended)
 - JSONB columns with GIN indexes
 - Automatic timestamp management
 - Foreign key constraints with cascade delete
@@ -312,8 +360,8 @@ await checkops.createSubmission({
 - `004_create_id_counters.sql`
 
 ### Notes
-- Requires Node.js 24+
-- Requires PostgreSQL 18+
+- Requires Node.js 18+
+- Requires PostgreSQL 12+ (PostgreSQL 18 recommended)
 - Peer dependency: `pg` package
 - Licensed under Apache 2.0
 

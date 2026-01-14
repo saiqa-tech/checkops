@@ -73,7 +73,7 @@ When activated, this power will:
 ## Database Requirements
 
 CheckOps v3.0.0 requires:
-- PostgreSQL 18 or higher (recommended for optimal performance)
+- PostgreSQL 12 or higher (PostgreSQL 18 recommended for optimal performance)
 - JSONB support (PostgreSQL 9.4+)
 - Enhanced connection pooling configuration
 - Database credentials with appropriate permissions
@@ -122,8 +122,8 @@ import CheckOps, {
 } from '@saiqa-tech/checkops';
 
 Before starting, ensure you have:
-- Node.js 24+ installed
-- PostgreSQL 18+ running and accessible
+- Node.js 18+ installed
+- PostgreSQL 12+ running and accessible (PostgreSQL 18 recommended)
 - npm or yarn package manager
 - Database credentials (host, port, database, user, password)
 
@@ -615,7 +615,7 @@ CheckOps supports the following question types:
 
 2. **Migration Errors**
    - Ensure user has CREATE TABLE permissions
-   - Check database version (PostgreSQL 18+ required)
+   - Check database version (PostgreSQL 12+ required, 18 recommended)
    - Verify network connectivity
 
 3. **Import Errors**
