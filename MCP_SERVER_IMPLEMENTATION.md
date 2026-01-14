@@ -17,7 +17,7 @@ After comprehensive research, we implemented a **single package approach** rathe
 
 ### Package Structure
 
-```
+```text
 checkops/
 ├── bin/
 │   └── mcp-server.js         # MCP server executable
@@ -41,7 +41,7 @@ checkops/
     "checkops-mcp-server": "./bin/mcp-server.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.18.0"
+    "@modelcontextprotocol/sdk": "^1.25.2"
   },
   "peerDependencies": {
     "pg": "^8.11.0",
@@ -62,7 +62,7 @@ checkops/
 
 - **Shebang**: `#!/usr/bin/env node` for direct execution
 - **ES Modules**: Uses import/export syntax
-- **Latest MCP SDK**: Uses `@modelcontextprotocol/sdk@^1.18.0`
+- **Latest MCP SDK**: Uses `@modelcontextprotocol/sdk@^1.25.2`
 - **Comprehensive Tools**: Exposes all CheckOps v3.0.0 features
 
 #### 3. Enhanced CheckOps Class
@@ -102,7 +102,7 @@ Updated `checkops-power/mcp.json` to use correct npx syntax:
 
 ## MCP Tools Exposed
 
-The MCP server exposes 16 comprehensive tools covering all CheckOps v3.0.0 capabilities:
+The MCP server exposes 17 comprehensive tools covering all CheckOps v3.0.0 capabilities:
 
 ### Core Operations (8 tools)
 1. `checkops_test_connection` - Test database connectivity
@@ -172,7 +172,7 @@ Configure MCP client with:
 
 ### Dependencies
 
-- **MCP SDK**: `@modelcontextprotocol/sdk@^1.18.0` (latest stable)
+- **MCP SDK**: `@modelcontextprotocol/sdk@^1.25.2` (latest stable)
 - **Zod**: `^3.25.0` (peer dependency for schema validation)
 - **PostgreSQL**: `pg@^8.11.0` (peer dependency)
 

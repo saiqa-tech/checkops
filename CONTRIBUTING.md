@@ -6,7 +6,7 @@ Thank you for your interest in contributing to CheckOps! This document provides 
 
 ### Prerequisites
 
-- Node.js 24 or higher
+- Node.js 18 or higher (Node.js 24+ recommended for development)
 - PostgreSQL 18 or higher
 - npm or yarn
 

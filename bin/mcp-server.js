@@ -36,6 +36,8 @@ class CheckOpsMCPServer {
         if (this.checkops) return this.checkops;
 
         try {
+            // Environment variables are passed from MCP client configuration
+            // Defaults are provided here for missing values
             this.checkops = new CheckOps({
                 host: process.env.DB_HOST || 'localhost',
                 port: parseInt(process.env.DB_PORT) || 5432,
@@ -353,7 +355,7 @@ class CheckOpsMCPServer {
 
                 // Original v2.x.x tools
                 switch (name) {
-                    case 'checkops_test_connection':
+                    case 'checkops_test_connection': {
                         return {
                             content: [
                                 {
@@ -362,8 +364,9 @@ class CheckOpsMCPServer {
                                 },
                             ],
                         };
+                    }
 
-                    case 'checkops_create_form':
+                    case 'checkops_create_form': {
                         const form = await checkops.createForm(args);
                         return {
                             content: [
@@ -377,8 +380,9 @@ class CheckOpsMCPServer {
                                 },
                             ],
                         };
+                    }
 
-                    case 'checkops_get_forms':
+                    case 'checkops_get_forms': {
                         if (args.id) {
                             const form = await checkops.getForm(args.id);
                             return {
@@ -400,8 +404,9 @@ class CheckOpsMCPServer {
                                 ],
                             };
                         }
+                    }
 
-                    case 'checkops_create_submission':
+                    case 'checkops_create_submission': {
                         const submission = await checkops.createSubmission(args);
                         return {
                             content: [
@@ -415,8 +420,9 @@ class CheckOpsMCPServer {
                                 },
                             ],
                         };
+                    }
 
-                    case 'checkops_get_submissions':
+                    case 'checkops_get_submissions': {
                         const submissions = await checkops.getSubmissionsByForm(
                             args.formId,
                             { limit: args.limit, offset: args.offset }
@@ -429,8 +435,9 @@ class CheckOpsMCPServer {
                                 },
                             ],
                         };
+                    }
 
-                    case 'checkops_get_stats':
+                    case 'checkops_get_stats': {
                         const stats = await checkops.getSubmissionStats(args.formId);
                         return {
                             content: [
@@ -440,8 +447,9 @@ class CheckOpsMCPServer {
                                 },
                             ],
                         };
+                    }
 
-                    case 'checkops_create_question':
+                    case 'checkops_create_question': {
                         const question = await checkops.createQuestion(args);
                         return {
                             content: [
@@ -455,8 +463,9 @@ class CheckOpsMCPServer {
                                 },
                             ],
                         };
+                    }
 
-                    case 'checkops_get_questions':
+                    case 'checkops_get_questions': {
                         if (args.id) {
                             const question = await checkops.getQuestion(args.id);
                             return {
@@ -478,9 +487,11 @@ class CheckOpsMCPServer {
                                 ],
                             };
                         }
+                    }
 
-                    default:
+                    default: {
                         throw new Error(`Unknown tool: ${name}`);
+                    }
                 }
             } catch (error) {
                 return {
@@ -499,7 +510,7 @@ class CheckOpsMCPServer {
     // NEW v3.0.0 TOOL HANDLERS
     async handleMonitoringTools(name, args, checkops) {
         switch (name) {
-            case 'checkops_start_monitoring':
+            case 'checkops_start_monitoring': {
                 this.enableMonitoring();
                 if (args.intervalMs) {
                     productionMetrics.startMonitoring(args.intervalMs);
@@ -512,8 +523,9 @@ class CheckOpsMCPServer {
                         },
                     ],
                 };
+            }
 
-            case 'checkops_get_metrics':
+            case 'checkops_get_metrics': {
                 const metrics = productionMetrics.exportMetricsReport(args.format || 'json');
                 return {
                     content: [
@@ -523,8 +535,9 @@ class CheckOpsMCPServer {
                         },
                     ],
                 };
+            }
 
-            case 'checkops_get_health_status':
+            case 'checkops_get_health_status': {
                 const health = productionMetrics.getHealthStatus();
                 return {
                     content: [
@@ -534,8 +547,9 @@ class CheckOpsMCPServer {
                         },
                     ],
                 };
+            }
 
-            case 'checkops_get_performance_trends':
+            case 'checkops_get_performance_trends': {
                 const trends = productionMetrics.getPerformanceTrends(args.timeRangeMinutes || 60);
                 return {
                     content: [
@@ -545,15 +559,17 @@ class CheckOpsMCPServer {
                         },
                     ],
                 };
+            }
 
-            default:
+            default: {
                 throw new Error(`Unknown monitoring tool: ${name}`);
+            }
         }
     }
 
     async handleBatchOperations(name, args, checkops) {
         switch (name) {
-            case 'checkops_bulk_create_forms':
+            case 'checkops_bulk_create_forms': {
                 // Note: This assumes bulk methods exist in CheckOps v3.0.0
                 // If they don't exist, we'll need to implement them or fall back to individual operations
                 let forms;
@@ -583,8 +599,9 @@ class CheckOpsMCPServer {
                         },
                     ],
                 };
+            }
 
-            case 'checkops_bulk_create_submissions':
+            case 'checkops_bulk_create_submissions': {
                 let submissions;
                 if (typeof checkops.bulkCreateSubmissions === 'function') {
                     submissions = await recordBatchOperation(
@@ -619,8 +636,9 @@ class CheckOpsMCPServer {
                         },
                     ],
                 };
+            }
 
-            case 'checkops_bulk_create_questions':
+            case 'checkops_bulk_create_questions': {
                 let questions;
                 if (typeof checkops.bulkCreateQuestions === 'function') {
                     questions = await recordBatchOperation(
@@ -648,15 +666,17 @@ class CheckOpsMCPServer {
                         },
                     ],
                 };
+            }
 
-            default:
+            default: {
                 throw new Error(`Unknown batch operation: ${name}`);
+            }
         }
     }
 
     async handleCacheOperations(name, args, checkops) {
         switch (name) {
-            case 'checkops_get_cache_stats':
+            case 'checkops_get_cache_stats': {
                 const cacheStats = checkops.getCacheStats ? checkops.getCacheStats() : { message: 'Cache statistics not available' };
                 return {
                     content: [
@@ -666,8 +686,9 @@ class CheckOpsMCPServer {
                         },
                     ],
                 };
+            }
 
-            case 'checkops_clear_cache':
+            case 'checkops_clear_cache': {
                 let clearResult;
                 if (checkops.clearCache) {
                     clearResult = await checkops.clearCache(args.type || 'all', args.id);
@@ -686,9 +707,11 @@ class CheckOpsMCPServer {
                         },
                     ],
                 };
+            }
 
-            default:
+            default: {
                 throw new Error(`Unknown cache operation: ${name}`);
+            }
         }
     }
 
