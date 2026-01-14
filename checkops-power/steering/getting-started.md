@@ -5,8 +5,8 @@ This comprehensive guide walks you through setting up CheckOps in your Node.js p
 ## Prerequisites
 
 Before you begin, ensure you have:
-- Node.js 24+ installed
-- PostgreSQL 18+ running and accessible
+- Node.js 18+ installed
+- PostgreSQL 12+ running and accessible (PostgreSQL 18 recommended)
 - npm or yarn package manager
 - Basic knowledge of JavaScript/Node.js
 - Database credentials ready
@@ -480,8 +480,8 @@ Once you have CheckOps running:
 
 ## Verification Checklist
 
-- [ ] Node.js 24+ installed
-- [ ] PostgreSQL 18+ running
+- [ ] Node.js 18+ installed
+- [ ] PostgreSQL 12+ running (PostgreSQL 18 recommended)
 - [ ] Dependencies installed
 - [ ] `.env` file configured
 - [ ] Database created with proper permissions

@@ -613,3 +613,425 @@ try {
   submittedAt: '2024-01-01T00:00:00Z'
 }
 ```
+
+
+## Performance Monitoring (v3.0.0)
+
+### Metrics Collection
+
+CheckOps v3.0.0 includes built-in performance monitoring.
+
+```javascript
+import CheckOps, { metricsCollector, productionMetrics } from '@saiqa-tech/checkops';
+```
+
+#### metricsCollector.getMetrics()
+
+Get current performance metrics.
+
+**Returns:** `Object` - Metrics object
+
+**Response Structure:**
+
+```javascript
+{
+  operations: Map<string, OperationStats>,
+  batchOperations: Map<string, BatchStats>,
+  cacheHits: number,
+  cacheMisses: number,
+  validations: ValidationStats,
+  connections: ConnectionStats
+}
+```
+
+**Example:**
+
+```javascript
+const metrics = metricsCollector.getMetrics();
+console.log('Cache hit rate:', metrics.cacheHits / (metrics.cacheHits + metrics.cacheMisses));
+```
+
+#### metricsCollector.reset()
+
+Reset all metrics to zero.
+
+**Returns:** `void`
+
+**Example:**
+
+```javascript
+metricsCollector.reset();
+```
+
+### Production Metrics
+
+#### productionMetrics.recordOperation(name, duration)
+
+Record a custom operation metric.
+
+**Parameters:**
+- `name` (String, required) - Operation name
+- `duration` (Number, required) - Duration in milliseconds
+
+**Example:**
+
+```javascript
+const start = Date.now();
+await myOperation();
+productionMetrics.recordOperation('myOperation', Date.now() - start);
+```
+
+#### productionMetrics.recordError(operation, error)
+
+Record an error for an operation.
+
+**Parameters:**
+- `operation` (String, required) - Operation name
+- `error` (Error, required) - Error object
+
+**Example:**
+
+```javascript
+try {
+  await checkops.createForm(data);
+} catch (error) {
+  productionMetrics.recordError('createForm', error);
+  throw error;
+}
+```
+
+### Health Checks
+
+#### getHealthCheckData()
+
+Get comprehensive health check data.
+
+**Returns:** `Promise<Object>` - Health check object
+
+**Example:**
+
+```javascript
+import { getHealthCheckData } from '@saiqa-tech/checkops';
+
+const health = await getHealthCheckData();
+console.log('System status:', health.status);
+```
+
+## Cache Management (v3.0.0)
+
+### getCacheStats()
+
+```javascript
+checkops.getCacheStats()
+```
+
+Get cache performance statistics.
+
+**Returns:** `Object` - Cache statistics
+
+**Response Structure:**
+
+```javascript
+{
+  forms: { size, hits, misses, hitRate, maxSize, evictions },
+  questions: { size, hits, misses, hitRate, maxSize, evictions },
+  stats: { size, hits, misses, hitRate, maxSize, evictions },
+  submissions: { size, hits, misses, hitRate, maxSize, evictions },
+  query: { size, hits, misses, hitRate, maxSize, evictions },
+  total: { size, hits, misses, hitRate, maxSize, evictions }
+}
+```
+
+**Example:**
+
+```javascript
+const cacheStats = checkops.getCacheStats();
+console.log('Overall cache hit rate:', cacheStats.total.hitRate);
+```
+
+### clearCache()
+
+```javascript
+await checkops.clearCache(type, id)
+```
+
+Clear cache entries.
+
+**Parameters:**
+- `type` (String, optional) - Cache type: 'all', 'form', 'question', 'stats', 'submission'. Default: 'all'
+- `id` (String, optional) - Specific ID to clear. If omitted, clears all entries of that type
+
+**Returns:** `Promise<Object>` - Result message
+
+**Examples:**
+
+```javascript
+// Clear all caches
+await checkops.clearCache('all');
+
+// Clear all form caches
+await checkops.clearCache('form');
+
+// Clear specific form cache
+await checkops.clearCache('form', 'FORM-001');
+
+// Clear all stats caches
+await checkops.clearCache('stats');
+```
+
+## Batch Operations (v3.0.0)
+
+### bulkCreateForms()
+
+```javascript
+await checkops.bulkCreateForms(formsData)
+```
+
+Create multiple forms in a single transaction.
+
+**Parameters:**
+- `formsData` (Array<Object>, required) - Array of form objects
+
+**Returns:** `Promise<Array<Form>>` - Array of created forms
+
+**Example:**
+
+```javascript
+const formsData = [
+  {
+    title: 'Form 1',
+    description: 'Description 1',
+    questions: [...]
+  },
+  {
+    title: 'Form 2',
+    description: 'Description 2',
+    questions: [...]
+  }
+];
+
+const forms = await checkops.bulkCreateForms(formsData);
+console.log(`Created ${forms.length} forms`);
+```
+
+**Performance:** 10-20x faster than individual creates for 100+ forms.
+
+### bulkCreateQuestions()
+
+```javascript
+await checkops.bulkCreateQuestions(questionsData)
+```
+
+Create multiple questions in a single transaction.
+
+**Parameters:**
+- `questionsData` (Array<Object>, required) - Array of question objects
+
+**Returns:** `Promise<Array<Question>>` - Array of created questions
+
+**Example:**
+
+```javascript
+const questionsData = [
+  {
+    questionText: 'Full Name',
+    questionType: 'text',
+    metadata: { category: 'personal' }
+  },
+  {
+    questionText: 'Email',
+    questionType: 'email',
+    metadata: { category: 'contact' }
+  }
+];
+
+const questions = await checkops.bulkCreateQuestions(questionsData);
+```
+
+**Performance:** 15-25x faster than individual creates for 100+ questions.
+
+### bulkCreateSubmissions()
+
+```javascript
+await checkops.bulkCreateSubmissions(submissionsData)
+```
+
+Create multiple submissions in a single transaction.
+
+**Parameters:**
+- `submissionsData` (Array<Object>, required) - Array of submission objects
+
+**Returns:** `Promise<Array<Submission>>` - Array of created submissions
+
+**Example:**
+
+```javascript
+const submissionsData = [
+  {
+    formId: 'FORM-001',
+    submissionData: {
+      'Q-001': 'John Doe',
+      'Q-002': 'john@example.com'
+    },
+    metadata: { source: 'import' }
+  },
+  {
+    formId: 'FORM-001',
+    submissionData: {
+      'Q-001': 'Jane Smith',
+      'Q-002': 'jane@example.com'
+    },
+    metadata: { source: 'import' }
+  }
+];
+
+const submissions = await checkops.bulkCreateSubmissions(submissionsData);
+```
+
+**Performance:** 10-20x faster than individual creates for 100+ submissions.
+
+**Note:** All batch operations are transactional - if any item fails, all are rolled back.
+
+## MCP Server Integration (v3.0.0)
+
+CheckOps v3.0.0 includes a Model Context Protocol (MCP) server for AI development tools.
+
+### Installation
+
+The MCP server is included with the CheckOps package:
+
+```bash
+npm install -g @saiqa-tech/checkops
+```
+
+### Running the MCP Server
+
+```bash
+# Direct execution
+checkops-mcp-server
+
+# Or via npx
+npx --package=@saiqa-tech/checkops@latest checkops-mcp-server
+```
+
+### Configuration
+
+Set environment variables for database connection:
+
+```bash
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=checkops
+export DB_USER=postgres
+export DB_PASSWORD=your_password
+```
+
+### Available MCP Tools
+
+The MCP server exposes 17 tools:
+
+**Core Operations:**
+- `checkops_test_connection`
+- `checkops_create_form`
+- `checkops_get_forms`
+- `checkops_create_submission`
+- `checkops_get_submissions`
+- `checkops_get_stats`
+- `checkops_create_question`
+- `checkops_get_questions`
+
+**Performance Monitoring:**
+- `checkops_start_monitoring`
+- `checkops_get_metrics`
+- `checkops_get_health_status`
+- `checkops_get_performance_trends`
+
+**Batch Operations:**
+- `checkops_bulk_create_forms`
+- `checkops_bulk_create_submissions`
+- `checkops_bulk_create_questions`
+
+**Cache Management:**
+- `checkops_get_cache_stats`
+- `checkops_clear_cache`
+
+For detailed MCP server documentation, see [MCP_SERVER_IMPLEMENTATION.md](../MCP_SERVER_IMPLEMENTATION.md).
+
+## Monitoring Wrappers (v3.0.0)
+
+### withMonitoring()
+
+Wrap any async function with automatic performance monitoring.
+
+```javascript
+import { withMonitoring } from '@saiqa-tech/checkops';
+
+const monitoredFunction = withMonitoring('operationName', async (data) => {
+  // Your logic here
+  return await processData(data);
+});
+
+// Metrics automatically collected
+const result = await monitoredFunction(myData);
+```
+
+### withModelMonitoring()
+
+Wrap model methods with monitoring.
+
+```javascript
+import { withModelMonitoring } from '@saiqa-tech/checkops';
+
+class CustomModel {
+  static async create(data) {
+    return withModelMonitoring('CustomModel', 'create', async () => {
+      return await db.insert(data);
+    });
+  }
+}
+```
+
+### recordBatchOperation()
+
+Monitor batch operations with size tracking.
+
+```javascript
+import { recordBatchOperation } from '@saiqa-tech/checkops';
+
+const bulkInsert = recordBatchOperation('bulkInsert', 100, async (records) => {
+  return await db.insertMany(records);
+});
+
+await bulkInsert(myRecords);
+```
+
+## Version History
+
+### v3.0.0 (Current)
+
+**New Features:**
+- Performance monitoring and metrics collection
+- Batch operations (bulk create)
+- Cache management APIs
+- MCP server integration
+- Health check endpoints
+- Monitoring wrappers
+
+**Breaking Changes:**
+- None (fully backward compatible)
+
+### v2.1.0
+
+**New Features:**
+- Option key-value system
+- Option label update with history tracking
+- Stats cache invalidation
+
+### v2.0.0
+
+**New Features:**
+- Question bank
+- Form-question relationship
+- Centralized question reusability
+
+For complete version history, see [CHANGELOG.md](../CHANGELOG.md).

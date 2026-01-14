@@ -4,7 +4,7 @@ This document describes the database schema for CheckOps.
 
 ## Overview
 
-CheckOps uses PostgreSQL 18 with JSONB support for flexible, high-performance data storage. The schema consists of four main tables:
+CheckOps uses PostgreSQL 12 or higher (PostgreSQL 18 recommended) with JSONB support for flexible, high-performance data storage. The schema consists of four main tables:
 
 1. **forms** - Stores form definitions
 2. **question_bank** - Centralized repository of reusable questions

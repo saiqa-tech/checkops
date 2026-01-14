@@ -7,8 +7,8 @@ CheckOps (@saiqa-tech/checkops) is a production-ready Node.js npm package for bu
 
 ### Core Package Structure
 ✅ ES Module-based npm package
-✅ Node.js 24+ compatible
-✅ PostgreSQL 18 with JSONB support
+✅ Node.js 18+ compatible
+✅ PostgreSQL 12+ with JSONB support (PostgreSQL 18 recommended)
 ✅ Production-ready with comprehensive error handling
 
 ### Database Schema (4 Tables)

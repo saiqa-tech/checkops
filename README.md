@@ -15,6 +15,10 @@ A production-ready Node.js npm package that enables developers to create dynamic
 - 🚀 **PostgreSQL 18 + JSONB** - High-performance database with flexible schema
 - 📈 **Submission Analytics** - Built-in statistics and reporting
 - 📝 **Option History Tracking** - Audit trail for all option label changes
+- ⚡ **Performance Monitoring (v3.0.0)** - Real-time metrics and health checks
+- 🚄 **Batch Operations (v3.0.0)** - High-performance bulk create operations (10-50x faster)
+- 💾 **Intelligent Caching (v3.0.0)** - Automatic query caching with dependency tracking
+- 🤖 **MCP Server (v3.0.0)** - Model Context Protocol integration for AI development tools
 - 🧪 **80%+ Test Coverage** - Comprehensive unit and integration tests
 - 📖 **Well Documented** - Complete API reference and usage guides
 
@@ -24,7 +28,7 @@ A production-ready Node.js npm package that enables developers to create dynamic
 npm install @saiqa-tech/checkops pg
 ```
 
-**Note:** CheckOps requires PostgreSQL 18 and the `pg` package as peer dependencies.
+**Note:** CheckOps requires PostgreSQL 12 or higher (PostgreSQL 18 recommended) and the `pg` package as peer dependencies.
 
 ## Quick Start
 
@@ -132,16 +136,34 @@ console.log('Question statistics:', stats.questionStats);
 
 ## Documentation
 
-- [API Reference](./docs/API_REFERENCE.md) - Complete API documentation
-- [Usage Guide](./docs/USAGE_GUIDE.md) - Detailed usage examples
+### Getting Started
+- [Quick Start](#quick-start) - Get up and running in minutes
+- [Installation Guide](./CONTRIBUTING.md#setup-development-environment) - Detailed setup instructions
+
+### Core Documentation
+- [API Reference](./docs/API_REFERENCE.md) - Complete API documentation with v3.0.0 features
+- [Usage Guide](./docs/USAGE_GUIDE.md) - Detailed usage examples and patterns
 - [Examples](./docs/EXAMPLES.md) - Real-world code examples
-- [Database Schema](./docs/DATABASE_SCHEMA.md) - Database structure
-- [Architecture](./docs/ARCHITECTURE.md) - System architecture
-- [Security](./docs/SECURITY.md) - Security best practices
+- [Non-Technical Overview](./docs/NON_TECHNICAL_OVERVIEW.md) - Beginner-friendly explanation
+
+### Architecture & Design
+- [Database Schema](./docs/DATABASE_SCHEMA.md) - Database structure and relationships
+- [Architecture](./docs/ARCHITECTURE.md) - System architecture and design patterns
+- [Security](./docs/SECURITY.md) - Security best practices and guidelines
+
+### v3.0.0 Features
+- [Performance Monitoring](./docs/PERFORMANCE_MONITORING.md) - Metrics, monitoring, and health checks
+- [Batch Operations](./docs/BATCH_OPERATIONS.md) - High-performance bulk operations
+- [MCP Server](./MCP_SERVER_IMPLEMENTATION.md) - Model Context Protocol integration
+
+### Migration & Support
+- [Migration Guide](./docs/MIGRATION_GUIDE.md) - Upgrade between versions
+- [FAQ](./docs/FAQ.md) - Frequently asked questions
+- [Changelog](./CHANGELOG.md) - Version history and changes
 
 ## Database Requirements
 
-- PostgreSQL 18 or higher
+- PostgreSQL 12 or higher (PostgreSQL 18 recommended)
 - JSONB support (included in PostgreSQL 9.4+)
 - Sufficient storage for form data
 
@@ -157,6 +179,54 @@ Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 - GitHub Issues: [https://github.com/saiqa-tech/checkops/issues](https://github.com/saiqa-tech/checkops/issues)
 - Documentation: [https://github.com/saiqa-tech/checkops](https://github.com/saiqa-tech/checkops)
+
+## Recent Updates (v3.0.0)
+
+### Performance Monitoring
+Track operation performance, cache effectiveness, and system health in real-time:
+
+```javascript
+import CheckOps, { metricsCollector, getHealthCheckData } from '@saiqa-tech/checkops';
+
+// Get performance metrics
+const metrics = metricsCollector.getMetrics();
+console.log('Cache hit rate:', metrics.cacheHits / (metrics.cacheHits + metrics.cacheMisses));
+
+// Health check
+const health = await getHealthCheckData();
+console.log('System status:', health.status);
+
+// Cache management
+const cacheStats = checkops.getCacheStats();
+await checkops.clearCache('stats');
+```
+
+### Batch Operations
+Create multiple entities 10-50x faster with bulk operations:
+
+```javascript
+// Bulk create forms
+const forms = await checkops.bulkCreateForms([
+  { title: 'Form 1', questions: [...] },
+  { title: 'Form 2', questions: [...] }
+]);
+
+// Bulk create submissions (perfect for imports)
+const submissions = await checkops.bulkCreateSubmissions([
+  { formId: 'FORM-001', submissionData: {...} },
+  { formId: 'FORM-001', submissionData: {...} }
+]);
+```
+
+### MCP Server Integration
+Use CheckOps with AI development tools (Kiro, Cursor, Claude Code):
+
+```bash
+# Run MCP server
+npx --package=@saiqa-tech/checkops@latest checkops-mcp-server
+```
+
+See [Performance Monitoring Guide](./docs/PERFORMANCE_MONITORING.md) and [Batch Operations Guide](./docs/BATCH_OPERATIONS.md) for details.
 
 ## Recent Updates (v2.1.0)
 
