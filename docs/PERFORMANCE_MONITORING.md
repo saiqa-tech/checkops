@@ -186,9 +186,12 @@ app.get('/metrics/prometheus', (req, res) => {
   });
   
   // Cache metrics
+  const cacheDenom = metrics.cacheHits + metrics.cacheMisses;
+  const cacheHitRate = cacheDenom > 0 ? metrics.cacheHits / cacheDenom : 0;
+  
   prometheus += `checkops_cache_hits ${metrics.cacheHits}\n`;
   prometheus += `checkops_cache_misses ${metrics.cacheMisses}\n`;
-  prometheus += `checkops_cache_hit_rate ${metrics.cacheHits / (metrics.cacheHits + metrics.cacheMisses)}\n`;
+  prometheus += `checkops_cache_hit_rate ${cacheHitRate}\n`;
   
   res.set('Content-Type', 'text/plain');
   res.send(prometheus);
@@ -430,9 +433,12 @@ setInterval(() => {
   });
   
   // Cache metrics
+  const cacheDenom = metrics.cacheHits + metrics.cacheMisses;
+  const cacheHitRate = cacheDenom > 0 ? metrics.cacheHits / cacheDenom : 0;
+  
   statsd.gauge('checkops.cache.hits', metrics.cacheHits);
   statsd.gauge('checkops.cache.misses', metrics.cacheMisses);
-  statsd.gauge('checkops.cache.hit_rate', metrics.cacheHits / (metrics.cacheHits + metrics.cacheMisses));
+  statsd.gauge('checkops.cache.hit_rate', cacheHitRate);
 }, 10000);
 ```
 
@@ -483,6 +489,10 @@ setInterval(sendToCloudWatch, 60000);
 app.get('/api/metrics', (req, res) => {
   const metrics = metricsCollector.getMetrics();
   
+  // Calculate cache hit rate safely
+  const cacheDenom = metrics.cacheHits + metrics.cacheMisses;
+  const cacheHitRate = cacheDenom > 0 ? metrics.cacheHits / cacheDenom : 0;
+  
   // Format for Grafana JSON datasource
   const grafanaMetrics = {
     operations: Array.from(metrics.operations.entries()).map(([name, stats]) => ({
@@ -494,7 +504,7 @@ app.get('/api/metrics', (req, res) => {
       ]
     })),
     cache: {
-      hitRate: metrics.cacheHits / (metrics.cacheHits + metrics.cacheMisses),
+      hitRate: cacheHitRate,
       hits: metrics.cacheHits,
       misses: metrics.cacheMisses
     }
@@ -543,9 +553,10 @@ function checkMetricsHealth() {
     }
   });
   
-  // Cache hit rate alert
-  const cacheHitRate = metrics.cacheHits / (metrics.cacheHits + metrics.cacheMisses);
-  if (cacheHitRate < 0.7) {  // 70% hit rate
+  // Cache hit rate alert (safe division)
+  const cacheDenom = metrics.cacheHits + metrics.cacheMisses;
+  const cacheHitRate = cacheDenom > 0 ? metrics.cacheHits / cacheDenom : 0;
+  if (cacheHitRate < 0.7 && cacheDenom > 0) {  // 70% hit rate, only alert if we have data
     sendAlert(`Low cache hit rate: ${(cacheHitRate * 100).toFixed(2)}%`);
   }
   
@@ -571,7 +582,11 @@ function exportMetrics() {
   const metrics = metricsCollector.getMetrics();
   const timestamp = new Date().toISOString();
   
-  const export = {
+  // Calculate cache hit rate safely
+  const cacheDenom = metrics.cacheHits + metrics.cacheMisses;
+  const cacheHitRate = cacheDenom > 0 ? metrics.cacheHits / cacheDenom : 0;
+  
+  const exportData = {
     timestamp,
     metrics: {
       operations: Object.fromEntries(metrics.operations),
@@ -579,7 +594,7 @@ function exportMetrics() {
       cache: {
         hits: metrics.cacheHits,
         misses: metrics.cacheMisses,
-        hitRate: metrics.cacheHits / (metrics.cacheHits + metrics.cacheMisses)
+        hitRate: cacheHitRate
       },
       validations: metrics.validations,
       connections: metrics.connections
