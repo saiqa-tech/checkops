@@ -1,5 +1,6 @@
 import { ValidationError } from './errors.js';
 import { OptionUtils } from './optionUtils.js';
+import { isUUID, isSID } from './idResolver.js';
 
 export function validateEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -63,7 +64,7 @@ export function validateString(value, fieldName, minLength = 0, maxLength = Infi
 
 export function validateNumber(value, fieldName, min = -Infinity, max = Infinity) {
   const num = Number(value);
-  
+
   if (isNaN(num)) {
     throw new ValidationError(`${fieldName} must be a valid number`);
   }
@@ -99,6 +100,17 @@ export function validateBoolean(value, fieldName) {
 
 export function validateQuestion(question) {
   validateRequired(question, 'Question');
+
+  // NEW: Support simple string format (UUID only)
+  if (typeof question === 'string') {
+    // Validate it's a valid UUID
+    if (!isUUID(question)) {
+      throw new ValidationError('Question ID must be a valid UUID');
+    }
+    return; // Valid string UUID
+  }
+
+  // Original: Support object format
   validateObject(question, 'Question');
 
   if (!question.questionId && !question.questionText) {
@@ -216,5 +228,81 @@ export function validateSubmissionData(submissionData, formQuestions) {
 
   if (errors.length > 0) {
     throw new ValidationError('Validation failed', errors);
+  }
+}
+
+/**
+ * v4.0.0: ID Validation Functions for Dual-ID System
+ */
+
+/**
+ * Validate Form ID (UUID only)
+ * @param {string} id - Form UUID to validate
+ * @param {string} fieldName - Field name for error messages
+ * @throws {ValidationError} If ID format is invalid
+ */
+export function validateFormId(id, fieldName = 'Form ID') {
+  if (!id) {
+    throw new ValidationError(`${fieldName} is required`);
+  }
+
+  if (!isUUID(id)) {
+    throw new ValidationError(
+      `${fieldName} must be a valid UUID`
+    );
+  }
+}
+
+/**
+ * Validate Question ID (UUID only)
+ * @param {string} id - Question UUID to validate
+ * @param {string} fieldName - Field name for error messages
+ * @throws {ValidationError} If ID format is invalid
+ */
+export function validateQuestionId(id, fieldName = 'Question ID') {
+  if (!id) {
+    throw new ValidationError(`${fieldName} is required`);
+  }
+
+  if (!isUUID(id)) {
+    throw new ValidationError(
+      `${fieldName} must be a valid UUID`
+    );
+  }
+}
+
+/**
+ * Validate Submission ID (UUID only)
+ * @param {string} id - Submission UUID to validate
+ * @param {string} fieldName - Field name for error messages
+ * @throws {ValidationError} If ID format is invalid
+ */
+export function validateSubmissionId(id, fieldName = 'Submission ID') {
+  if (!id) {
+    throw new ValidationError(`${fieldName} is required`);
+  }
+
+  if (!isUUID(id)) {
+    throw new ValidationError(
+      `${fieldName} must be a valid UUID`
+    );
+  }
+}
+
+/**
+ * Validate generic ID (accepts UUID or SID without prefix check)
+ * @param {string} id - ID to validate
+ * @param {string} fieldName - Field name for error messages
+ * @throws {ValidationError} If ID format is invalid
+ */
+export function validateId(id, fieldName = 'ID') {
+  if (!id) {
+    throw new ValidationError(`${fieldName} is required`);
+  }
+
+  if (!isUUID(id) && !isSID(id)) {
+    throw new ValidationError(
+      `${fieldName} must be a valid UUID or SID format`
+    );
   }
 }

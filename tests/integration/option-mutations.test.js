@@ -1,5 +1,7 @@
 import CheckOps from '../../src/index.js';
 import { getPool } from '../../src/config/database.js';
+import { isUUID, isSID, validateFormIds, validateQuestionIds, validateSubmissionIds } from '../helpers/validators.js';
+import { cleanupAllTestData } from '../helpers/cleanup.js';
 
 describe('Option Mutations: Complex State Changes', () => {
     let checkops;
@@ -34,11 +36,8 @@ describe('Option Mutations: Complex State Changes', () => {
             return;
         }
 
-        await pool.query('DELETE FROM submissions');
-        await pool.query('DELETE FROM forms');
-        await pool.query('DELETE FROM question_bank');
-        await pool.query('DELETE FROM question_option_history');
-        await pool.query("UPDATE id_counters SET current_value = 0 WHERE entity_type IN ('FORM', 'Q', 'SUB')");
+        // Use cleanup helper to delete test data
+        await cleanupAllTestData(checkops);
     });
 
     describe('Sequential Label Changes', () => {
@@ -50,41 +49,45 @@ describe('Option Mutations: Complex State Changes', () => {
                 questionType: 'select',
                 options: [{ key: 'status_1', label: 'Status One' }],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Submit with original label
+            // Submit with key (not label)
             const submission1 = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: 'Status One' },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: 'status_1' },  // Use key, not label
             });
+            validateSubmissionIds(submission1);
 
             const labels = ['Updated Label 1', 'Changed Again', 'Third Change', 'Fourth Version', 'Final Label'];
             const submissions = [submission1];
 
             // Apply 5 sequential label changes
             for (const newLabel of labels) {
-                await checkops.updateOptionLabel(question.id, 'status_1', newLabel);
+                await checkops.updateOptionLabel(question.id, 'status_1', newLabel);  // Use UUID
 
-                // Submit with new label after each change
+                // Submit with key (not new label) after each change
                 const submission = await checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: newLabel },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: 'status_1' },  // Use key, not label
                 });
+                validateSubmissionIds(submission);
                 submissions.push(submission);
 
                 // Verify raw key is still the same
-                const retrieved = await checkops.getSubmission(submission.id);
+                const retrieved = await checkops.getSubmission(submission.id);  // Use UUID
                 expect(retrieved._rawData[question.id]).toBe('status_1');
                 expect(retrieved.submissionData[question.id]).toBe(newLabel);
             }
 
             // Verify all submissions have same key but final label
             const allSubmissions = await Promise.all(
-                submissions.map(sub => checkops.getSubmission(sub.id))
+                submissions.map(sub => checkops.getSubmission(sub.id))  // Use UUID
             );
 
             allSubmissions.forEach(sub => {
@@ -97,7 +100,7 @@ describe('Option Mutations: Complex State Changes', () => {
             try {
                 const result = await client.query(
                     'SELECT * FROM question_option_history WHERE question_id = $1 ORDER BY changed_at ASC',
-                    [question.id]
+                    [question.id]  // Use UUID
                 );
                 expect(result.rows.length).toBeGreaterThanOrEqual(5);
                 expect(result.rows[result.rows.length - 1].new_label).toBe('Final Label');
@@ -117,39 +120,41 @@ describe('Option Mutations: Complex State Changes', () => {
                     { key: 'cat_b', label: 'Category B' },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Add submissions
+            // Add submissions with keys
             for (let i = 0; i < 5; i++) {
                 await checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: 'Category A' },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: 'cat_a' },  // Use key, not label
                 });
             }
 
             for (let i = 0; i < 3; i++) {
                 await checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: 'Category B' },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: 'cat_b' },  // Use key, not label
                 });
             }
 
             // Change label and verify stats still correct
-            await checkops.updateOptionLabel(question.id, 'cat_a', 'Type A');
+            await checkops.updateOptionLabel(question.id, 'cat_a', 'Type A');  // Use UUID
 
-            const stats = await checkops.getSubmissionStats(form.id);
+            const stats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats.totalSubmissions).toBe(8);
             expect(stats.questionStats[question.id].answerDistribution['Type A']).toBe(5);
             expect(stats.questionStats[question.id].answerDistribution['Category B']).toBe(3);
 
             // Change second label
-            await checkops.updateOptionLabel(question.id, 'cat_b', 'Type B');
+            await checkops.updateOptionLabel(question.id, 'cat_b', 'Type B');  // Use UUID
 
-            const stats2 = await checkops.getSubmissionStats(form.id);
+            const stats2 = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats2.totalSubmissions).toBe(8);
             expect(stats2.questionStats[question.id].answerDistribution['Type A']).toBe(5);
             expect(stats2.questionStats[question.id].answerDistribution['Type B']).toBe(3);
@@ -169,41 +174,44 @@ describe('Option Mutations: Complex State Changes', () => {
                     { key: 'p3', label: 'High' },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Submit all options
+            // Submit all options with keys
             const submissions = [];
-            for (const label of ['Low', 'Medium', 'High', 'Low', 'High']) {
+            for (const key of ['p1', 'p2', 'p3', 'p1', 'p3']) {
                 const sub = await checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: label },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: key },  // Use key, not label
                 });
+                validateSubmissionIds(sub);
                 submissions.push(sub);
             }
 
             // Verify original stats
-            let stats = await checkops.getSubmissionStats(form.id);
+            let stats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats.questionStats[question.id].answerDistribution['Low']).toBe(2);
             expect(stats.questionStats[question.id].answerDistribution['Medium']).toBe(1);
             expect(stats.questionStats[question.id].answerDistribution['High']).toBe(2);
 
             // Reorder options by updating them
-            await checkops.updateOptionLabel(question.id, 'p3', 'High');
-            await checkops.updateOptionLabel(question.id, 'p1', 'Low');
+            await checkops.updateOptionLabel(question.id, 'p3', 'High');  // Use UUID
+            await checkops.updateOptionLabel(question.id, 'p1', 'Low');  // Use UUID
 
             // Stats should remain unchanged
-            stats = await checkops.getSubmissionStats(form.id);
+            stats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats.questionStats[question.id].answerDistribution['Low']).toBe(2);
             expect(stats.questionStats[question.id].answerDistribution['Medium']).toBe(1);
             expect(stats.questionStats[question.id].answerDistribution['High']).toBe(2);
 
             // All submissions should still be retrievable with correct data
             for (const sub of submissions) {
-                const retrieved = await checkops.getSubmission(sub.id);
+                const retrieved = await checkops.getSubmission(sub.id);  // Use UUID
                 expect(retrieved._rawData[question.id]).toBeTruthy();
             }
         });
@@ -218,23 +226,26 @@ describe('Option Mutations: Complex State Changes', () => {
                     { key: 'opt_1', label: 'Option 1', metadata: { color: 'red' } },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Submit response
+            // Submit response with key
             const submission = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: 'Option 1' },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: 'opt_1' },  // Use key, not label
             });
+            validateSubmissionIds(submission);
 
             // Update label (metadata may change)
-            await checkops.updateOptionLabel(question.id, 'opt_1', 'Updated Option 1');
+            await checkops.updateOptionLabel(question.id, 'opt_1', 'Updated Option 1');  // Use UUID
 
             // Original submission should still be valid
-            const retrieved = await checkops.getSubmission(submission.id);
+            const retrieved = await checkops.getSubmission(submission.id);  // Use UUID
             expect(retrieved._rawData[question.id]).toBe('opt_1');
             expect(retrieved.submissionData[question.id]).toBe('Updated Option 1');
         });
@@ -253,30 +264,34 @@ describe('Option Mutations: Complex State Changes', () => {
                     { key: 'feat_3', label: 'Feature Three' },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Submit with original labels
+            // Submit with keys (not labels)
             const sub1 = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: ['Feature One', 'Feature Two'] },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: ['feat_1', 'feat_2'] },  // Use keys, not labels
             });
+            validateSubmissionIds(sub1);
 
             // Change label
-            await checkops.updateOptionLabel(question.id, 'feat_1', 'Primary Feature');
+            await checkops.updateOptionLabel(question.id, 'feat_1', 'Primary Feature');  // Use UUID
 
-            // Submit with mixed old and new labels
+            // Submit with keys (not labels)
             const sub2 = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: ['Primary Feature', 'Feature Three'] },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: ['feat_1', 'feat_3'] },  // Use keys, not labels
             });
+            validateSubmissionIds(sub2);
 
             // Verify both submissions
-            const retrieved1 = await checkops.getSubmission(sub1.id);
-            const retrieved2 = await checkops.getSubmission(sub2.id);
+            const retrieved1 = await checkops.getSubmission(sub1.id);  // Use UUID
+            const retrieved2 = await checkops.getSubmission(sub2.id);  // Use UUID
 
             // Both should show updated labels
             expect(retrieved1.submissionData[question.id]).toContain('Primary Feature');
@@ -304,34 +319,36 @@ describe('Option Mutations: Complex State Changes', () => {
                     { key: 'int_art', label: 'Art' },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
+            });
+            validateFormIds(form);
+
+            // Submit various combinations with keys
+            await checkops.createSubmission({
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: ['int_sport', 'int_music'] },  // Use keys, not labels
             });
 
-            // Submit various combinations
             await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: ['Sports', 'Music'] },
-            });
-
-            await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: ['Sports', 'Art'] },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: ['int_sport', 'int_art'] },  // Use keys, not labels
             });
 
             // Change label
-            await checkops.updateOptionLabel(question.id, 'int_sport', 'Athletics');
+            await checkops.updateOptionLabel(question.id, 'int_sport', 'Athletics');  // Use UUID
 
-            // Submit with new label
+            // Submit with key (not new label)
             await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: ['Athletics', 'Music'] },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: ['int_sport', 'int_music'] },  // Use keys, not labels
             });
 
             // Verify stats
-            const stats = await checkops.getSubmissionStats(form.id);
+            const stats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats.totalSubmissions).toBe(3);
             expect(stats.questionStats[question.id].answerDistribution['Athletics']).toBe(3);
             expect(stats.questionStats[question.id].answerDistribution['Music']).toBe(2);
@@ -351,23 +368,26 @@ describe('Option Mutations: Complex State Changes', () => {
                     { key: 'status_archived', label: 'Archived', disabled: true },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Submit before disabling
+            // Submit with key (not label)
             const sub1 = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: 'Active' },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: 'status_active' },  // Use key, not label
             });
+            validateSubmissionIds(sub1);
 
             // Submission should work with active option
             expect(sub1.id).toBeTruthy();
 
             // Retrieve and verify
-            const retrieved = await checkops.getSubmission(sub1.id);
+            const retrieved = await checkops.getSubmission(sub1.id);  // Use UUID
             expect(retrieved._rawData[question.id]).toBe('status_active');
             expect(retrieved.submissionData[question.id]).toBe('Active');
         });

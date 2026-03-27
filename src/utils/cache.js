@@ -1,7 +1,10 @@
 /**
  * LRU Cache Implementation with TTL support
  * Optimized for CheckOps form and question caching
+ * v4.0.0: Supports dual-ID system (UUID + SID)
  */
+
+import { isUUID, isSID } from './idResolver.js';
 
 export class LRUCache {
     constructor(maxSize = 100, ttl = 300000) { // 5 minutes default TTL
@@ -178,17 +181,58 @@ export class CheckOpsCache {
         this.submissionCache = new LRUCache(500, 120000); // 500 submissions, 2 min TTL
     }
 
-    // Form caching methods
+    // Form caching methods - v4.0.0: Cache by both UUID and SID
     getForm(id) {
-        return this.formCache.get(`form:${id}`);
+        // Try direct lookup first
+        const cached = this.formCache.get(`form:${id}`);
+        if (cached) return cached;
+
+        // If not found and it's a UUID, try SID lookup
+        if (isUUID(id) && cached && cached.sid) {
+            return this.formCache.get(`form:${cached.sid}`);
+        }
+
+        // If not found and it's a SID, try UUID lookup
+        if (isSID(id, 'FORM') && cached && cached.id) {
+            return this.formCache.get(`form:${cached.id}`);
+        }
+
+        return undefined;
     }
 
     setForm(id, form, ttl) {
-        this.formCache.set(`form:${id}`, form, ttl);
+        // Cache by UUID (primary)
+        if (form.id) {
+            this.formCache.set(`form:${form.id}`, form, ttl);
+        }
+
+        // Also cache by SID for quick lookup
+        if (form.sid) {
+            this.formCache.set(`form:${form.sid}`, form, ttl);
+        }
+
+        // If id parameter is provided and different, cache by that too
+        if (id && id !== form.id && id !== form.sid) {
+            this.formCache.set(`form:${id}`, form, ttl);
+        }
     }
 
     deleteForm(id) {
-        return this.formCache.delete(`form:${id}`);
+        // Try to get the form first to delete both UUID and SID entries
+        const form = this.getForm(id);
+
+        let deleted = this.formCache.delete(`form:${id}`);
+
+        if (form) {
+            if (form.id && form.id !== id) {
+                deleted = this.formCache.delete(`form:${form.id}`) || deleted;
+            }
+            if (form.sid && form.sid !== id) {
+                deleted = this.formCache.delete(`form:${form.sid}`) || deleted;
+            }
+        }
+
+        return deleted;
     }
 
     // Question caching methods
@@ -220,26 +264,54 @@ export class CheckOpsCache {
         return this.statsCache.delete(`stats:${formId}`);
     }
 
-    // Submission caching methods
+    // Submission caching methods - v4.0.0: Cache by both UUID and SID
     getSubmission(id) {
         return this.submissionCache.get(`submission:${id}`);
     }
 
     setSubmission(id, submission, ttl) {
-        this.submissionCache.set(`submission:${id}`, submission, ttl);
+        // Cache by UUID (primary)
+        if (submission.id) {
+            this.submissionCache.set(`submission:${submission.id}`, submission, ttl);
+        }
+
+        // Also cache by SID for quick lookup
+        if (submission.sid) {
+            this.submissionCache.set(`submission:${submission.sid}`, submission, ttl);
+        }
+
+        // If id parameter is provided and different, cache by that too
+        if (id && id !== submission.id && id !== submission.sid) {
+            this.submissionCache.set(`submission:${id}`, submission, ttl);
+        }
     }
 
     deleteSubmission(id) {
-        return this.submissionCache.delete(`submission:${id}`);
+        // Try to get the submission first to delete both UUID and SID entries
+        const submission = this.getSubmission(id);
+
+        let deleted = this.submissionCache.delete(`submission:${id}`);
+
+        if (submission) {
+            if (submission.id && submission.id !== id) {
+                deleted = this.submissionCache.delete(`submission:${submission.id}`) || deleted;
+            }
+            if (submission.sid && submission.sid !== id) {
+                deleted = this.submissionCache.delete(`submission:${submission.sid}`) || deleted;
+            }
+        }
+
+        return deleted;
     }
 
-    // Bulk operations
+    // Bulk operations - v4.0.0: Handle both UUID and SID
     invalidateForm(formId) {
         // When a form is updated, invalidate related caches
         this.deleteForm(formId);
         this.deleteStats(formId);
 
         // Clear submission cache entries for this form
+        // Note: formId in submission could be UUID, need to check both
         const submissionKeys = this.submissionCache.keys();
         submissionKeys.forEach(key => {
             const submission = this.submissionCache.peek(key);

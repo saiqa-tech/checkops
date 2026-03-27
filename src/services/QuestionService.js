@@ -43,16 +43,21 @@ export class QuestionService {
     });
   }
 
-  async getQuestionById(id) {
-    validateRequired(id, 'Question ID');
-    return await Question.findById(id);
+  /**
+   * Get question by UUID (internal use)
+   * @param {string} uuid - Question UUID
+   * @returns {Promise<Question>}
+   */
+  async getQuestionById(uuid) {
+    validateRequired(uuid, 'Question UUID');
+    return await Question.findById(uuid);
   }
 
-  async getQuestionsByIds(ids) {
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+  async getQuestionsByIds(uuids) {
+    if (!uuids || !Array.isArray(uuids) || uuids.length === 0) {
       return [];
     }
-    return await Question.findByIds(ids);
+    return await Question.findByIds(uuids);
   }
 
   async getAllQuestions({ questionType = null, isActive = null, limit = 100, offset = 0 } = {}) {
@@ -63,10 +68,16 @@ export class QuestionService {
     return await Question.findAll({ questionType, isActive, limit, offset });
   }
 
-  async updateQuestion(id, updates) {
-    validateRequired(id, 'Question ID');
+  /**
+   * Update question by UUID (internal use)
+   * @param {string} uuid - Question UUID
+   * @param {object} updates - Updates to apply
+   * @returns {Promise<Question>}
+   */
+  async updateQuestionById(uuid, updates) {
+    validateRequired(uuid, 'Question UUID');
 
-    const question = await Question.findById(id);
+    const question = await Question.findById(uuid);
     const sanitizedUpdates = {};
 
     if (updates.questionText !== undefined) {
@@ -84,7 +95,7 @@ export class QuestionService {
     if (updates.options !== undefined) {
       const questionType = updates.questionType || question.questionType;
       if (updates.options && OptionUtils.requiresOptions(questionType)) {
-        sanitizedUpdates.options = OptionUtils.processOptions(updates.options, id);
+        sanitizedUpdates.options = OptionUtils.processOptions(updates.options, uuid);
       } else {
         sanitizedUpdates.options = updates.options ? sanitizeObject(updates.options) : null;
       }
@@ -102,22 +113,37 @@ export class QuestionService {
       sanitizedUpdates.isActive = updates.isActive;
     }
 
-    return await Question.update(id, sanitizedUpdates);
+    return await Question.updateById(uuid, sanitizedUpdates);
   }
 
-  async deleteQuestion(id) {
-    validateRequired(id, 'Question ID');
-    return await Question.delete(id);
+  /**
+   * Delete question by UUID (internal use)
+   * @param {string} uuid - Question UUID
+   * @returns {Promise<Question>}
+   */
+  async deleteQuestionById(uuid) {
+    validateRequired(uuid, 'Question UUID');
+    return await Question.deleteById(uuid);
   }
 
-  async deactivateQuestion(id) {
-    validateRequired(id, 'Question ID');
-    return await Question.update(id, { isActive: false });
+  /**
+   * Deactivate question by UUID (internal use)
+   * @param {string} uuid - Question UUID
+   * @returns {Promise<Question>}
+   */
+  async deactivateQuestionById(uuid) {
+    validateRequired(uuid, 'Question UUID');
+    return await Question.updateById(uuid, { isActive: false });
   }
 
-  async activateQuestion(id) {
-    validateRequired(id, 'Question ID');
-    return await Question.update(id, { isActive: true });
+  /**
+   * Activate question by UUID (internal use)
+   * @param {string} uuid - Question UUID
+   * @returns {Promise<Question>}
+   */
+  async activateQuestionById(uuid) {
+    validateRequired(uuid, 'Question UUID');
+    return await Question.updateById(uuid, { isActive: true });
   }
 
   async getQuestionCount({ questionType = null, isActive = null } = {}) {
@@ -128,8 +154,16 @@ export class QuestionService {
     return await Question.count({ questionType, isActive });
   }
 
-  async updateOptionLabel(questionId, optionKey, newLabel, changedBy = null) {
-    validateRequired(questionId, 'Question ID');
+  /**
+   * Update option label by question UUID (internal use)
+   * @param {string} questionUuid - Question UUID
+   * @param {string} optionKey - Option key
+   * @param {string} newLabel - New label
+   * @param {string} changedBy - User who made the change
+   * @returns {Promise<Question>}
+   */
+  async updateOptionLabelById(questionUuid, optionKey, newLabel, changedBy = null) {
+    validateRequired(questionUuid, 'Question UUID');
     validateRequired(optionKey, 'Option key');
     validateRequired(newLabel, 'New label');
     validateString(newLabel, 'New label', 1, 500);
@@ -142,11 +176,11 @@ export class QuestionService {
 
       const questionResult = await client.query(
         'SELECT * FROM question_bank WHERE id = $1 FOR UPDATE',
-        [questionId]
+        [questionUuid]
       );
 
       if (questionResult.rows.length === 0) {
-        throw new NotFoundError('Question', questionId);
+        throw new NotFoundError('Question', questionUuid);
       }
 
       const question = Question.fromRow(questionResult.rows[0]);
@@ -179,11 +213,11 @@ export class QuestionService {
          SET options = $1, updated_at = CURRENT_TIMESTAMP
          WHERE id = $2
          RETURNING *`,
-        [JSON.stringify(updatedOptions), questionId]
+        [JSON.stringify(updatedOptions), questionUuid]
       );
 
       await this._recordOptionLabelChange(
-        questionId,
+        questionUuid,
         optionKey,
         oldLabel,
         sanitizedLabel,
@@ -196,14 +230,18 @@ export class QuestionService {
       // After successful update, invalidate stats cache for all forms using this question
       // Forms store questions as JSONB array, so we query to find matching forms
       const formsResult = await pool.query(
-        `SELECT id, questions FROM forms WHERE questions IS NOT NULL`
+        `SELECT id, sid, questions FROM forms WHERE questions IS NOT NULL`
       );
 
       formsResult.rows.forEach(row => {
         const questions = Array.isArray(row.questions) ? row.questions : [];
-        const usesThisQuestion = questions.some(q => q.questionId === questionId);
+        // Check if form uses this question (questionId can be UUID or SID)
+        const usesThisQuestion = questions.some(q =>
+          q.questionId === question.id || q.questionId === question.sid
+        );
         if (usesThisQuestion) {
           checkOpsCache.deleteStats(row.id);
+          checkOpsCache.deleteStats(row.sid);
         }
       });
 
@@ -216,8 +254,14 @@ export class QuestionService {
     }
   }
 
-  async getOptionHistory(questionId, optionKey = null) {
-    validateRequired(questionId, 'Question ID');
+  /**
+   * Get option history by question UUID (internal use)
+   * @param {string} questionUuid - Question UUID
+   * @param {string} optionKey - Optional option key filter
+   * @returns {Promise<Array>}
+   */
+  async getOptionHistoryById(questionUuid, optionKey = null) {
+    validateRequired(questionUuid, 'Question UUID');
 
     const pool = getPool();
     let query = `
@@ -225,7 +269,7 @@ export class QuestionService {
       FROM question_option_history
       WHERE question_id = $1
     `;
-    const params = [questionId];
+    const params = [questionUuid];
 
     if (optionKey) {
       query += ' AND option_key = $2';
@@ -250,10 +294,23 @@ export class QuestionService {
 
   async _recordOptionLabelChange(questionId, optionKey, oldLabel, newLabel, changedBy = null, client = null) {
     const runner = client || getPool();
+
+    // Get question SID for the history record
+    const questionResult = await runner.query(
+      `SELECT sid FROM question_bank WHERE id = $1`,
+      [questionId]
+    );
+
+    if (questionResult.rows.length === 0) {
+      throw new Error(`Question not found: ${questionId}`);
+    }
+
+    const questionSid = questionResult.rows[0].sid;
+
     await runner.query(
-      `INSERT INTO question_option_history (question_id, option_key, old_label, new_label, changed_by)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [questionId, optionKey, oldLabel, newLabel, changedBy]
+      `INSERT INTO question_option_history (question_id, question_sid, option_key, old_label, new_label, changed_by)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [questionId, questionSid, optionKey, oldLabel, newLabel, changedBy]
     );
   }
 }

@@ -1,6 +1,8 @@
 import CheckOps from '../../src/index.js';
 import { getPool } from '../../src/config/database.js';
 import { ValidationError } from '../../src/utils/errors.js';
+import { isUUID, isSID, validateFormIds, validateQuestionIds, validateSubmissionIds } from '../helpers/validators.js';
+import { cleanupAllTestData } from '../helpers/cleanup.js';
 
 describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
     let checkops;
@@ -35,11 +37,8 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
             return;
         }
 
-        await pool.query('DELETE FROM submissions');
-        await pool.query('DELETE FROM forms');
-        await pool.query('DELETE FROM question_bank');
-        await pool.query('DELETE FROM question_option_history');
-        await pool.query("UPDATE id_counters SET current_value = 0 WHERE entity_type IN ('FORM', 'Q', 'SUB')");
+        // Use cleanup helper to delete test data
+        await cleanupAllTestData(checkops);
     });
 
     describe('Invalid Input Validation', () => {
@@ -51,13 +50,15 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 questionType: 'select',
                 options: [{ key: 'opt_1', label: 'Valid Option' }],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
-            // Attempt to submit with non-existent option
+            // Attempt to submit with non-existent option - expects error, no validation needed
             expect(async () => {
                 await checkops.createSubmission({
                     formId: form.id,
@@ -77,13 +78,15 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                     { key: 'feat_2', label: 'Feature 2' },
                 ],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
-            // Mix of valid and invalid
+            // Mix of valid and invalid - expects error, no validation needed
             expect(async () => {
                 await checkops.createSubmission({
                     formId: form.id,
@@ -102,17 +105,20 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                     { key: 'opt_1', label: "O'Reilly" }, // Single quote in label
                 ],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
             // Should be able to handle special chars
             const submission = await checkops.createSubmission({
                 formId: form.id,
                 submissionData: { [question.id]: "O'Reilly" },
             });
+            validateSubmissionIds(submission);  // Valid entity created
 
             expect(submission.id).toBeTruthy();
 
@@ -129,13 +135,15 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 questionType: 'select',
                 options: [{ key: 'opt_1', label: 'Option 1' }],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
-            // Null value should be rejected or handled
+            // Null value should be rejected or handled - expects error, no validation needed
             expect(async () => {
                 await checkops.createSubmission({
                     formId: form.id,
@@ -152,17 +160,20 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 questionType: 'select',
                 options: [{ key: 'opt_1', label: "O'Reilly" }], // Single quote in label
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
             // Submit with the dangerous-looking label
             const submission = await checkops.createSubmission({
                 formId: form.id,
                 submissionData: { [question.id]: "O'Reilly" },
             });
+            validateSubmissionIds(submission);  // Valid entity created
 
             expect(submission.id).toBeTruthy();
 
@@ -183,17 +194,20 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 questionType: 'select',
                 options: [{ key: 'opt_long', label: longLabel }],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
             // Submit with long label
             const submission = await checkops.createSubmission({
                 formId: form.id,
                 submissionData: { [question.id]: longLabel },
             });
+            validateSubmissionIds(submission);  // Valid entity created
 
             expect(submission.id).toBeTruthy();
 
@@ -216,6 +230,7 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 questionType: 'select',
                 options,
             });
+            validateQuestionIds(question);  // Valid entity created
 
             expect(question.id).toBeTruthy();
 
@@ -223,12 +238,14 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
             // Submit with one of the many options
             const submission = await checkops.createSubmission({
                 formId: form.id,
                 submissionData: { [question.id]: 'Option 500' },
             });
+            validateSubmissionIds(submission);  // Valid entity created
 
             expect(submission.id).toBeTruthy();
 
@@ -248,11 +265,13 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                     { key: 'opt_b', label: 'Option B' },
                 ],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
             // Create 100 submissions (simulating high volume)
             for (let i = 0; i < 100; i++) {
@@ -260,6 +279,7 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                     formId: form.id,
                     submissionData: { [question.id]: i % 2 === 0 ? 'Option A' : 'Option B' },
                 });
+                // Note: Not validating each submission in loop for performance
             }
 
             // Stats should handle large count accurately
@@ -278,6 +298,7 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                     questionText: `Question ${i}`,
                     questionType: 'text',
                 });
+                // Note: Not validating each question in loop for performance
                 questions.push({ questionId: q.id });
             }
 
@@ -285,6 +306,7 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 title: 'Large Form',
                 questions,
             });
+            validateFormIds(form);  // Valid entity created
 
             expect(form.id).toBeTruthy();
             expect(form.questions.length).toBe(50);
@@ -299,6 +321,7 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 formId: form.id,
                 submissionData,
             });
+            validateSubmissionIds(submission);  // Valid entity created
 
             expect(submission.id).toBeTruthy();
 
@@ -317,8 +340,9 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 questionType: 'select',
                 options: [{ key: 'opt_1', label: 'Option 1' }],
             });
+            validateQuestionIds(question);  // Valid entity created
 
-            // Attempt to update non-existent option
+            // Attempt to update non-existent option - expects error, no validation needed
             expect(async () => {
                 await checkops.updateOptionLabel(question.id, 'non_existent_key', 'New Label');
             }).rejects.toThrow();
@@ -331,14 +355,16 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 questionText: 'Test',
                 questionType: 'text',
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
             // Delete form (if deletion is supported)
-            // For now, test with non-existent form ID
+            // For now, test with non-existent form ID - expects error, no validation needed
             expect(async () => {
                 await checkops.createSubmission({
                     formId: 9999, // Non-existent form
@@ -357,13 +383,15 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                 questionType: 'select',
                 options: [{ key: 'opt_1', label: 'Option 1' }],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
-            // Attempt with number instead of string
+            // Attempt with number instead of string - expects error, no validation needed
             expect(async () => {
                 await checkops.createSubmission({
                     formId: form.id,
@@ -383,13 +411,15 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                     { key: 'feat_2', label: 'Feature 2' },
                 ],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
-            // Attempt with string instead of array
+            // Attempt with string instead of array - expects error, no validation needed
             expect(async () => {
                 await checkops.createSubmission({
                     formId: form.id,
@@ -409,17 +439,20 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                     { key: 'feat_2', label: 'Feature 2' },
                 ],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
             // Empty array - should be allowed for optional questions
             const submission = await checkops.createSubmission({
                 formId: form.id,
                 submissionData: { [question.id]: [] },
             });
+            validateSubmissionIds(submission);  // Valid entity created
 
             expect(submission.id).toBeTruthy();
         });
@@ -437,17 +470,20 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                     { key: 'emoji_2', label: '🚀 Rocket' },
                 ],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
             // Submit with emoji
             const submission = await checkops.createSubmission({
                 formId: form.id,
                 submissionData: { [question.id]: '🎉 Celebration' },
             });
+            validateSubmissionIds(submission);  // Valid entity created
 
             expect(submission.id).toBeTruthy();
 
@@ -468,22 +504,26 @@ describe('Error Scenarios: Invalid Inputs & Edge Cases', () => {
                     { key: 'lang_3', label: 'العربية' },
                 ],
             });
+            validateQuestionIds(question);  // Valid entity created
 
             const form = await checkops.createForm({
                 title: 'Test Form',
                 questions: [{ questionId: question.id }],
             });
+            validateFormIds(form);  // Valid entity created
 
             // Submit with different Unicode languages
             const submission1 = await checkops.createSubmission({
                 formId: form.id,
                 submissionData: { [question.id]: '日本語' },
             });
+            validateSubmissionIds(submission1);  // Valid entity created
 
             const submission2 = await checkops.createSubmission({
                 formId: form.id,
                 submissionData: { [question.id]: 'العربية' },
             });
+            validateSubmissionIds(submission2);  // Valid entity created
 
             expect(submission1.id).toBeTruthy();
             expect(submission2.id).toBeTruthy();

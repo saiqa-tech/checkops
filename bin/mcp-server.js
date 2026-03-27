@@ -18,7 +18,7 @@ class CheckOpsMCPServer {
         this.server = new Server(
             {
                 name: 'checkops-tools',
-                version: '3.0.0',
+                version: '4.0.0',
             },
             {
                 capabilities: {
@@ -111,11 +111,11 @@ class CheckOpsMCPServer {
                 },
                 {
                     name: 'checkops_get_forms',
-                    description: 'Get all forms or specific form by ID',
+                    description: 'Get all forms or specific form by UUID',
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            id: { type: 'string', description: 'Optional form ID' },
+                            id: { type: 'string', description: 'Optional form UUID' },
                             limit: { type: 'number', description: 'Limit results' },
                             offset: { type: 'number', description: 'Offset for pagination' },
                         },
@@ -127,7 +127,7 @@ class CheckOpsMCPServer {
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            formId: { type: 'string', description: 'Form ID' },
+                            formId: { type: 'string', description: 'Form UUID' },
                             submissionData: {
                                 type: 'object',
                                 description: 'Submission data as key-value pairs',
@@ -142,7 +142,7 @@ class CheckOpsMCPServer {
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            formId: { type: 'string', description: 'Form ID' },
+                            formId: { type: 'string', description: 'Form UUID' },
                             limit: { type: 'number', description: 'Limit results' },
                             offset: { type: 'number', description: 'Offset for pagination' },
                         },
@@ -155,7 +155,7 @@ class CheckOpsMCPServer {
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            formId: { type: 'string', description: 'Form ID' },
+                            formId: { type: 'string', description: 'Form UUID' },
                         },
                         required: ['formId'],
                     },
@@ -176,11 +176,11 @@ class CheckOpsMCPServer {
                 },
                 {
                     name: 'checkops_get_questions',
-                    description: 'Get all questions or specific question by ID',
+                    description: 'Get all questions or specific question by UUID',
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            id: { type: 'string', description: 'Optional question ID' },
+                            id: { type: 'string', description: 'Optional question UUID' },
                             limit: { type: 'number', description: 'Limit results' },
                             offset: { type: 'number', description: 'Offset for pagination' },
                         },
@@ -269,7 +269,7 @@ class CheckOpsMCPServer {
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            formId: { type: 'string', description: 'Form ID' },
+                            formId: { type: 'string', description: 'Form UUID' },
                             submissions: {
                                 type: 'array',
                                 description: 'Array of submission data objects',
@@ -323,13 +323,13 @@ class CheckOpsMCPServer {
                         properties: {
                             type: {
                                 type: 'string',
-                                description: 'Cache type to clear: form, question, stats, submission, or all',
+                                description: 'Cache type to clear: form, question, stats, submission, or all. Note: IDs are UUIDs.',
                                 enum: ['form', 'question', 'stats', 'submission', 'all'],
                                 default: 'all'
                             },
                             id: {
                                 type: 'string',
-                                description: 'Specific ID to clear (optional, clears all if not provided)'
+                                description: 'Specific UUID to clear (optional, clears all if not provided)'
                             },
                         },
                     },

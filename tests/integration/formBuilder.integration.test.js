@@ -1,4 +1,6 @@
 import CheckOps from '../../src/index.js';
+import { isUUID, isSID, validateFormIds } from '../helpers/validators.js';
+import { cleanupAllTestData } from '../helpers/cleanup.js';
 
 describe('Form Builder Integration Tests', () => {
   let checkops;
@@ -14,6 +16,8 @@ describe('Form Builder Integration Tests', () => {
 
     try {
       await checkops.initialize();
+      // Clean up any existing test data
+      await cleanupAllTestData(checkops);
     } catch (error) {
       console.log('Database not available for integration tests, skipping...');
     }
@@ -21,6 +25,8 @@ describe('Form Builder Integration Tests', () => {
 
   afterAll(async () => {
     if (checkops && checkops.initialized) {
+      // Clean up test data before closing
+      await cleanupAllTestData(checkops);
       await checkops.close();
     }
   });
@@ -36,6 +42,7 @@ describe('Form Builder Integration Tests', () => {
     it.skip('should create, retrieve, update, and delete a form', async () => {
       if (!checkops.initialized) return;
 
+      // Create form
       const form = await checkops.createForm({
         title: 'Integration Test Form',
         description: 'Test form for integration testing',
@@ -48,17 +55,27 @@ describe('Form Builder Integration Tests', () => {
         ],
       });
 
+      // Verify form has both UUID and SID
       expect(form).toBeDefined();
-      expect(form.id).toMatch(/^FORM-\d+$/);
+      expect(isUUID(form.id)).toBe(true);
+      expect(isSID(form.sid, 'FORM')).toBe(true);
+      validateFormIds(form);
 
+      // Retrieve form by UUID
       const retrieved = await checkops.getForm(form.id);
       expect(retrieved.title).toBe('Integration Test Form');
+      expect(retrieved.id).toBe(form.id);
+      expect(retrieved.sid).toBe(form.sid);
 
+      // Update form by UUID
       const updated = await checkops.updateForm(form.id, {
         title: 'Updated Form Title',
       });
       expect(updated.title).toBe('Updated Form Title');
+      expect(updated.id).toBe(form.id);
+      expect(updated.sid).toBe(form.sid);
 
+      // Delete form by UUID
       await checkops.deleteForm(form.id);
     });
   });

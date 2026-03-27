@@ -9,6 +9,14 @@ import { getPool } from '../config/database.js';
 import { checkOpsCache } from '../utils/cache.js';
 
 export class SubmissionService {
+  /**
+   * Create submission (accepts formId UUID)
+   * @param {object} params
+   * @param {string} params.formId - Form UUID
+   * @param {object} params.submissionData - Submission data
+   * @param {object} params.metadata - Metadata
+   * @returns {Promise<Submission>}
+   */
   async createSubmission({ formId, submissionData, metadata = {} }) {
     validateRequired(formId, 'Form ID');
     validateRequired(submissionData, 'Submission data');
@@ -36,14 +44,20 @@ export class SubmissionService {
     });
 
     // Invalidate stats cache since we have a new submission
-    checkOpsCache.deleteStats(formId);
+    checkOpsCache.deleteStats(form.id);
+    checkOpsCache.deleteStats(form.sid);
 
     return submission;
   }
 
-  async getSubmissionById(id) {
-    validateRequired(id, 'Submission ID');
-    const submission = await Submission.findById(id);
+  /**
+   * Get submission by UUID (internal use)
+   * @param {string} uuid - Submission UUID
+   * @returns {Promise<Submission>}
+   */
+  async getSubmissionById(uuid) {
+    validateRequired(uuid, 'Submission UUID');
+    const submission = await Submission.findById(uuid);
 
     const form = await Form.findById(submission.formId);
     const questionsWithDetails = await this._getQuestionsWithDetails(form.questions);
@@ -57,11 +71,17 @@ export class SubmissionService {
     };
   }
 
-  async getSubmissionsByFormId(formId, { limit = 100, offset = 0 } = {}) {
-    validateRequired(formId, 'Form ID');
-    const submissions = await Submission.findByFormId(formId, { limit, offset });
+  /**
+   * Get submissions by form UUID (internal use)
+   * @param {string} formUuid - Form UUID
+   * @param {object} options - Pagination options
+   * @returns {Promise<Array<Submission>>}
+   */
+  async getSubmissionsByFormId(formUuid, { limit = 100, offset = 0 } = {}) {
+    validateRequired(formUuid, 'Form UUID');
+    const submissions = await Submission.findByFormId(formUuid, { limit, offset });
 
-    const form = await Form.findById(formId);
+    const form = await Form.findById(formUuid);
     const questionsWithDetails = await this._getQuestionsWithDetails(form.questions);
 
     return submissions.map((submission) => {
@@ -78,10 +98,16 @@ export class SubmissionService {
     return await Submission.findAll({ limit, offset });
   }
 
-  async updateSubmission(id, updates) {
-    validateRequired(id, 'Submission ID');
+  /**
+   * Update submission by UUID (internal use)
+   * @param {string} uuid - Submission UUID
+   * @param {object} updates - Updates to apply
+   * @returns {Promise<Submission>}
+   */
+  async updateSubmissionById(uuid, updates) {
+    validateRequired(uuid, 'Submission UUID');
 
-    const submission = await Submission.findById(id);
+    const submission = await Submission.findById(uuid);
 
     const sanitizedUpdates = {};
 
@@ -98,23 +124,39 @@ export class SubmissionService {
       sanitizedUpdates.metadata = sanitizeObject(updates.metadata);
     }
 
-    return await Submission.update(id, sanitizedUpdates);
+    return await Submission.updateById(uuid, sanitizedUpdates);
   }
 
-  async deleteSubmission(id) {
-    validateRequired(id, 'Submission ID');
-    return await Submission.delete(id);
+  /**
+   * Delete submission by UUID (internal use)
+   * @param {string} uuid - Submission UUID
+   * @returns {Promise<Submission>}
+   */
+  async deleteSubmissionById(uuid) {
+    validateRequired(uuid, 'Submission UUID');
+    return await Submission.deleteById(uuid);
   }
 
+  /**
+   * Get submission count
+   * @param {object} options
+   * @param {string} options.formId - Form UUID (optional)
+   * @returns {Promise<number>}
+   */
   async getSubmissionCount({ formId = null } = {}) {
     return await Submission.count({ formId });
   }
 
-  async getSubmissionStats(formId) {
-    validateRequired(formId, 'Form ID');
+  /**
+   * Get submission stats by form UUID (internal use)
+   * @param {string} formUuid - Form UUID
+   * @returns {Promise<object>}
+   */
+  async getSubmissionStatsById(formUuid) {
+    validateRequired(formUuid, 'Form UUID');
 
     // Check cache first
-    const cachedStats = checkOpsCache.getStats(formId);
+    const cachedStats = checkOpsCache.getStats(formUuid);
     if (cachedStats) {
       return cachedStats;
     }
@@ -132,11 +174,11 @@ export class SubmissionService {
       WHERE form_id = $1
     `;
 
-    const basicStatsResult = await pool.query(basicStatsQuery, [formId]);
+    const basicStatsResult = await pool.query(basicStatsQuery, [formUuid]);
     const basicStats = basicStatsResult.rows[0];
 
     // Step 2: Get form and question details (using our optimized enrichQuestions)
-    const form = await Form.findById(formId);
+    const form = await Form.findById(formUuid);
     const questionsWithDetails = await this._getQuestionsWithDetails(form.questions);
 
     // Step 3: Build stats object with database aggregation
@@ -149,17 +191,18 @@ export class SubmissionService {
 
     // Step 4: Calculate stats per question using database aggregation
     for (const question of questionsWithDetails) {
-      const questionId = question.questionId || question.id;
-      stats.questionStats[questionId] = await this._getQuestionStatsFromDB(formId, questionId, question);
+      const questionId = question.questionId || question.sid;
+      stats.questionStats[questionId] = await this._getQuestionStatsFromDB(formUuid, questionId, question);
     }
 
     // Cache the results (3 minute TTL for stats)
-    checkOpsCache.setStats(formId, stats, 180000);
+    checkOpsCache.setStats(formUuid, stats, 180000);
+    checkOpsCache.setStats(form.sid, stats, 180000);
 
     return stats;
   }
 
-  async _getQuestionStatsFromDB(formId, questionId, question) {
+  async _getQuestionStatsFromDB(formUuid, questionId, question) {
     const pool = getPool();
 
     // OPTIMIZATION: Single query per question using PostgreSQL JSONB functions
@@ -177,7 +220,7 @@ export class SubmissionService {
       FROM question_answers
     `;
 
-    const result = await pool.query(query, [formId, questionId]);
+    const result = await pool.query(query, [formUuid, questionId]);
     const row = result.rows[0];
 
     const baseStats = {
@@ -190,17 +233,17 @@ export class SubmissionService {
 
     // OPTIMIZATION: Only calculate distribution for questions with options
     if (question.options && OptionUtils.requiresOptions(question.questionType)) {
-      baseStats.answerDistribution = await this._getAnswerDistributionFromDB(formId, questionId, question);
-      baseStats._keyDistribution = await this._getKeyDistributionFromDB(formId, questionId, question);
+      baseStats.answerDistribution = await this._getAnswerDistributionFromDB(formUuid, questionId, question);
+      baseStats._keyDistribution = await this._getKeyDistributionFromDB(formUuid, questionId, question);
     } else {
       // For non-option questions, get simple answer distribution
-      baseStats.answerDistribution = await this._getSimpleAnswerDistributionFromDB(formId, questionId);
+      baseStats.answerDistribution = await this._getSimpleAnswerDistributionFromDB(formUuid, questionId);
     }
 
     return baseStats;
   }
 
-  async _getAnswerDistributionFromDB(formId, questionId, question) {
+  async _getAnswerDistributionFromDB(formUuid, questionId, question) {
     const pool = getPool();
 
     // Use PostgreSQL's aggregation for option counting
@@ -216,7 +259,7 @@ export class SubmissionService {
       GROUP BY submission_data->$2
     `;
 
-    const result = await pool.query(query, [formId, questionId]);
+    const result = await pool.query(query, [formUuid, questionId]);
 
     const distribution = {};
 
@@ -242,7 +285,7 @@ export class SubmissionService {
     return distribution;
   }
 
-  async _getKeyDistributionFromDB(formId, questionId, question) {
+  async _getKeyDistributionFromDB(formUuid, questionId, question) {
     const pool = getPool();
 
     const query = `
@@ -257,7 +300,7 @@ export class SubmissionService {
       GROUP BY submission_data->$2
     `;
 
-    const result = await pool.query(query, [formId, questionId]);
+    const result = await pool.query(query, [formUuid, questionId]);
 
     const keyDistribution = {};
 
@@ -277,7 +320,7 @@ export class SubmissionService {
     return keyDistribution;
   }
 
-  async _getSimpleAnswerDistributionFromDB(formId, questionId) {
+  async _getSimpleAnswerDistributionFromDB(formUuid, questionId) {
     const pool = getPool();
 
     const query = `
@@ -297,7 +340,7 @@ export class SubmissionService {
       GROUP BY answer_text
     `;
 
-    const result = await pool.query(query, [formId, questionId]);
+    const result = await pool.query(query, [formUuid, questionId]);
 
     const distribution = {};
     result.rows.forEach(row => {
@@ -308,36 +351,61 @@ export class SubmissionService {
   }
 
   async _getQuestionsWithDetails(formQuestions) {
+    // NEW: Handle simple string array format
     const questionIds = formQuestions
-      .filter((q) => q.questionId)
+      .filter((q) => typeof q === 'string') // Simple string UUIDs
+      .map((q) => q);
+
+    // Also handle old object format for backward compatibility during transition
+    const objectQuestionIds = formQuestions
+      .filter((q) => typeof q === 'object' && q.questionId)
       .map((q) => q.questionId);
 
-    if (questionIds.length === 0) {
+    const allQuestionIds = [...questionIds, ...objectQuestionIds];
+
+    if (allQuestionIds.length === 0) {
       return formQuestions;
     }
 
-    const questionDetails = await Question.findByIds(questionIds);
+    // Use findByIds since questionId contains UUIDs
+    const questionDetails = await Question.findByIds(allQuestionIds);
     const questionMap = new Map(questionDetails.map((q) => [q.id, q]));
 
     return formQuestions.map((q) => {
+      // Handle simple string format
+      if (typeof q === 'string') {
+        const details = questionMap.get(q);
+        return details ? details.toJSON() : null;
+      }
+
+      // Handle old object format
       if (q.questionId) {
         const details = questionMap.get(q.questionId);
         return details ? { ...q, ...details.toJSON(), questionId: q.questionId } : q;
       }
+
       return q;
-    });
+    }).filter(Boolean); // Remove nulls
   }
 
   _transformSubmissionToKeys(submissionData, questions) {
     const transformed = { ...submissionData };
 
     questions.forEach((question) => {
-      const questionId = question.questionId || question.id;
-      const answer = transformed[questionId];
+      // Try multiple possible keys: UUID (id), SID (sid), or questionId
+      const possibleKeys = [
+        question.id,           // UUID from question bank
+        question.sid,          // SID from question bank
+        question.questionId    // Reference from form.questions array
+      ].filter(Boolean);
 
-      if (answer !== undefined && answer !== null && answer !== '') {
-        if (question.options && OptionUtils.requiresOptions(question.questionType)) {
-          transformed[questionId] = OptionUtils.convertToKeys(answer, question.options);
+      for (const questionKey of possibleKeys) {
+        const answer = transformed[questionKey];
+
+        if (answer !== undefined && answer !== null && answer !== '') {
+          if (question.options && OptionUtils.requiresOptions(question.questionType)) {
+            transformed[questionKey] = OptionUtils.convertToKeys(answer, question.options);
+          }
         }
       }
     });
@@ -349,12 +417,20 @@ export class SubmissionService {
     const transformed = { ...submissionData };
 
     questions.forEach((question) => {
-      const questionId = question.questionId || question.id;
-      const answer = transformed[questionId];
+      // Try multiple possible keys: UUID (id), SID (sid), or questionId
+      const possibleKeys = [
+        question.id,           // UUID from question bank
+        question.sid,          // SID from question bank
+        question.questionId    // Reference from form.questions array
+      ].filter(Boolean);
 
-      if (answer !== undefined && answer !== null && answer !== '') {
-        if (question.options && OptionUtils.requiresOptions(question.questionType)) {
-          transformed[questionId] = OptionUtils.convertToLabels(answer, question.options);
+      for (const questionKey of possibleKeys) {
+        const answer = transformed[questionKey];
+
+        if (answer !== undefined && answer !== null && answer !== '') {
+          if (question.options && OptionUtils.requiresOptions(question.questionType)) {
+            transformed[questionKey] = OptionUtils.convertToLabels(answer, question.options);
+          }
         }
       }
     });

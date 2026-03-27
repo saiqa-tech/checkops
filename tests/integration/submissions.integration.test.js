@@ -1,4 +1,6 @@
 import CheckOps from '../../src/index.js';
+import { isUUID, isSID, validateFormIds, validateSubmissionIds } from '../helpers/validators.js';
+import { cleanupAllTestData } from '../helpers/cleanup.js';
 
 describe('Submissions Integration Tests', () => {
   let checkops;
@@ -14,6 +16,8 @@ describe('Submissions Integration Tests', () => {
 
     try {
       await checkops.initialize();
+      // Clean up any existing test data
+      await cleanupAllTestData(checkops);
     } catch (error) {
       console.log('Database not available for integration tests, skipping...');
     }
@@ -21,6 +25,8 @@ describe('Submissions Integration Tests', () => {
 
   afterAll(async () => {
     if (checkops && checkops.initialized) {
+      // Clean up test data before closing
+      await cleanupAllTestData(checkops);
       await checkops.close();
     }
   });
@@ -36,6 +42,7 @@ describe('Submissions Integration Tests', () => {
     it.skip('should create and retrieve submissions', async () => {
       if (!checkops.initialized) return;
 
+      // Create form
       const form = await checkops.createForm({
         title: 'Test Form',
         questions: [
@@ -48,17 +55,32 @@ describe('Submissions Integration Tests', () => {
         ],
       });
 
+      // Verify form has both UUID and SID
+      validateFormIds(form);
+
+      // Create submission using form UUID
       const submission = await checkops.createSubmission({
-        formId: form.id,
+        formId: form.id,  // UUID
         submissionData: { q1: 'John Doe' },
       });
 
+      // Verify submission has both UUID and SID, plus formId and formSid
       expect(submission).toBeDefined();
-      expect(submission.id).toMatch(/^SUB-\d+$/);
+      expect(isUUID(submission.id)).toBe(true);
+      expect(isSID(submission.sid, 'SUB')).toBe(true);
+      expect(submission.formId).toBe(form.id);  // UUID
+      expect(submission.formSid).toBe(form.sid);  // SID
+      validateSubmissionIds(submission);
 
+      // Retrieve submission by UUID
       const retrieved = await checkops.getSubmission(submission.id);
       expect(retrieved.submissionData.q1).toBe('John Doe');
+      expect(retrieved.id).toBe(submission.id);
+      expect(retrieved.sid).toBe(submission.sid);
+      expect(retrieved.formId).toBe(form.id);
+      expect(retrieved.formSid).toBe(form.sid);
 
+      // Delete submission and form by UUID
       await checkops.deleteSubmission(submission.id);
       await checkops.deleteForm(form.id);
     });
