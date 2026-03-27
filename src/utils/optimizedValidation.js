@@ -108,7 +108,16 @@ export function validateAndSanitizeQuestion(question) {
     const errors = [];
     const sanitized = {};
 
-    // Bypass validation for question bank references
+    // NEW: Support simple string format (UUID only)
+    if (typeof question === 'string') {
+        // Validate it's a valid UUID
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(question)) {
+            throw new ValidationError('Question ID must be a valid UUID');
+        }
+        return question; // Return the UUID string as-is
+    }
+
+    // Bypass validation for question bank references (object format)
     if (question.questionId) {
         sanitized.questionId = question.questionId;
 

@@ -29,7 +29,6 @@ export class FormService {
         metadata: sanitizedData.metadata,
       });
 
-      // Cache the newly created form
       checkOpsCache.setForm(form.id, form);
 
       return form;
@@ -44,18 +43,31 @@ export class FormService {
   }
 
   async enrichQuestions(questions) {
-    // OPTIMIZATION: Fix N+1 query problem by batching question lookups
+    // NEW: Normalize questions to simple string array format
+    // Convert any object format to string UUID
+    const normalizedQuestions = questions.map(q => {
+      if (typeof q === 'string') {
+        return q; // Already in simple format
+      }
+      if (q.questionId) {
+        return q.questionId; // Extract UUID from object
+      }
+      // If it's an inline question (has questionText), keep as object
+      if (q.questionText) {
+        return q;
+      }
+      throw new Error('Invalid question format');
+    });
 
-    // Step 1: Collect all unique question IDs that need enrichment
+    // OPTIMIZATION: Fix N+1 query problem by batching question lookups
+    // Step 1: Collect all unique question UUIDs that need enrichment
     const questionIds = [...new Set(
-      questions
-        .filter(q => q.questionId)
-        .map(q => q.questionId)
+      normalizedQuestions.filter(q => typeof q === 'string')
     )];
 
     // Early return if no questions need enrichment
     if (questionIds.length === 0) {
-      return questions;
+      return normalizedQuestions;
     }
 
     // Step 2: Check cache first for batch question data
@@ -85,47 +97,30 @@ export class FormService {
       }
     }
 
-    // Step 3: Enrich questions using the cached map (O(n) instead of O(n²))
-    return questions.map(question => {
-      if (!question.questionId) {
-        return question;
-      }
-
-      const bankQuestion = bankQuestionsMap.get(question.questionId);
-
-      if (!bankQuestion) {
-        // Fallback to original question if bank question not found
-        return question;
-      }
-
-      // Merge question data with bank question data
-      return {
-        questionId: question.questionId, // Preserve original reference
-        id: bankQuestion.id, // Bank question ID
-        questionText: question.questionText || bankQuestion.questionText,
-        questionType: question.questionType || bankQuestion.questionType,
-        options: question.options || bankQuestion.options,
-        validationRules: question.validationRules || bankQuestion.validationRules,
-        required: question.required !== undefined ? question.required : false,
-        metadata: { ...bankQuestion.metadata, ...question.metadata },
-      };
-    });
+    // Step 3: Return simple string array (UUIDs only)
+    // The enrichment is done at retrieval time, not storage time
+    return normalizedQuestions;
   }
 
-  async getFormById(id) {
-    validateRequired(id, 'Form ID');
+  /**
+   * Get form by UUID (internal use)
+   * @param {string} uuid - Form UUID
+   * @returns {Promise<Form>}
+   */
+  async getFormById(uuid) {
+    validateRequired(uuid, 'Form UUID');
 
-    // Try cache first
-    const cached = checkOpsCache.getForm(id);
+    // Try cache first (cache by UUID for internal operations)
+    const cached = checkOpsCache.getForm(uuid);
     if (cached) {
       return cached;
     }
 
     // Cache miss - fetch from database
-    const form = await Form.findById(id);
+    const form = await Form.findById(uuid);
 
     // Cache the result
-    checkOpsCache.setForm(id, form);
+    checkOpsCache.setForm(uuid, form);
 
     return form;
   }
@@ -136,8 +131,14 @@ export class FormService {
     return await Form.findAll({ isActive, limit, offset });
   }
 
-  async updateForm(id, updates) {
-    validateRequired(id, 'Form ID');
+  /**
+   * Update form by UUID (internal use)
+   * @param {string} uuid - Form UUID
+   * @param {object} updates - Updates to apply
+   * @returns {Promise<Form>}
+   */
+  async updateFormById(uuid, updates) {
+    validateRequired(uuid, 'Form UUID');
 
     const sanitizedUpdates = {};
 
@@ -164,43 +165,62 @@ export class FormService {
       sanitizedUpdates.isActive = updates.isActive;
     }
 
-    const updatedForm = await Form.update(id, sanitizedUpdates);
+    const updatedForm = await Form.updateById(uuid, sanitizedUpdates);
 
-    // Invalidate cache for this form and related data
-    checkOpsCache.invalidateForm(id);
+    // Invalidate cache for this form (by both UUID and SID)
+    checkOpsCache.invalidateForm(uuid);
+    checkOpsCache.invalidateForm(updatedForm.sid);
 
     return updatedForm;
   }
 
-  async deleteForm(id) {
-    validateRequired(id, 'Form ID');
+  /**
+   * Delete form by UUID (internal use)
+   * @param {string} uuid - Form UUID
+   * @returns {Promise<Form>}
+   */
+  async deleteFormById(uuid) {
+    validateRequired(uuid, 'Form UUID');
 
-    const result = await Form.delete(id);
+    const result = await Form.deleteById(uuid);
 
-    // Invalidate cache for this form and related data
-    checkOpsCache.invalidateForm(id);
-
-    return result;
-  }
-
-  async deactivateForm(id) {
-    validateRequired(id, 'Form ID');
-
-    const result = await Form.update(id, { isActive: false });
-
-    // Invalidate cache for this form
-    checkOpsCache.invalidateForm(id);
+    // Invalidate cache for this form (by both UUID and SID)
+    checkOpsCache.invalidateForm(uuid);
+    checkOpsCache.invalidateForm(result.sid);
 
     return result;
   }
 
-  async activateForm(id) {
-    validateRequired(id, 'Form ID');
+  /**
+   * Deactivate form by UUID (internal use)
+   * @param {string} uuid - Form UUID
+   * @returns {Promise<Form>}
+   */
+  async deactivateFormById(uuid) {
+    validateRequired(uuid, 'Form UUID');
 
-    const result = await Form.update(id, { isActive: true });
+    const result = await Form.updateById(uuid, { isActive: false });
 
     // Invalidate cache for this form
-    checkOpsCache.invalidateForm(id);
+    checkOpsCache.invalidateForm(uuid);
+    checkOpsCache.invalidateForm(result.sid);
+
+    return result;
+  }
+
+  /**
+   * Activate form by UUID (internal use)
+   * @param {string} uuid - Form UUID
+   * @returns {Promise<Form>}
+   */
+  async activateFormById(uuid) {
+    validateRequired(uuid, 'Form UUID');
+
+    const result = await Form.updateById(uuid, { isActive: true });
+
+    // Invalidate cache for this form
+    checkOpsCache.invalidateForm(uuid);
+    checkOpsCache.invalidateForm(result.sid);
 
     return result;
   }

@@ -1,5 +1,7 @@
 import CheckOps from '../../src/index.js';
 import { getPool } from '../../src/config/database.js';
+import { isUUID, isSID, validateFormIds, validateQuestionIds, validateSubmissionIds } from '../helpers/validators.js';
+import { cleanupAllTestData } from '../helpers/cleanup.js';
 
 describe('Concurrent Operations: Race Conditions & High Load', () => {
     let checkops;
@@ -34,11 +36,8 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
             return;
         }
 
-        await pool.query('DELETE FROM submissions');
-        await pool.query('DELETE FROM forms');
-        await pool.query('DELETE FROM question_bank');
-        await pool.query('DELETE FROM question_option_history');
-        await pool.query("UPDATE id_counters SET current_value = 0 WHERE entity_type IN ('FORM', 'Q', 'SUB')");
+        // Use cleanup helper to delete test data
+        await cleanupAllTestData(checkops);
     });
 
     describe('High Volume Concurrent Submissions', () => {
@@ -54,20 +53,22 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
                     { key: 'opt_c', label: 'Option C' },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Create 100 concurrent submissions with different options
+            // Create 100 concurrent submissions with different options (using keys)
             const submissionPromises = Array.from({ length: 100 }, (_, i) => {
-                const options = ['Option A', 'Option B', 'Option C'];
+                const options = ['opt_a', 'opt_b', 'opt_c'];
                 const selectedOption = options[i % 3];
 
                 return checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: selectedOption },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: selectedOption },  // Use key, not label
                 });
             });
 
@@ -75,9 +76,11 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
 
             expect(submissions).toHaveLength(100);
             expect(submissions.every(sub => sub.id)).toBe(true);
+            // Validate first submission as sample
+            validateSubmissionIds(submissions[0]);
 
             // Verify all submissions stored correctly
-            const stats = await checkops.getSubmissionStats(form.id);
+            const stats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats.totalSubmissions).toBe(100);
             expect(stats.questionStats[question.id].totalAnswers).toBe(100);
             expect(
@@ -101,27 +104,32 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
                     { key: 'rate_5', label: '5 - Excellent' },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Survey Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Create 500 concurrent submissions
+            // Create 500 concurrent submissions with keys
             const submissionPromises = Array.from({ length: 500 }, (_, i) => {
                 const rating = (i % 5) + 1;
+                const ratingKey = `rate_${rating}`;
                 return checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: `${rating} - ${['Poor', 'Fair', 'Good', 'Very Good', 'Excellent'][rating - 1]}` },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: ratingKey },  // Use key, not label
                 });
             });
 
             const submissions = await Promise.all(submissionPromises);
 
             expect(submissions).toHaveLength(500);
+            // Validate first submission as sample
+            validateSubmissionIds(submissions[0]);
 
             // Verify stats are accurate
-            const stats = await checkops.getSubmissionStats(form.id);
+            const stats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats.totalSubmissions).toBe(500);
 
             // Each rating should have ~100 submissions
@@ -144,36 +152,41 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
                     { key: 'status_inactive', label: 'Inactive' },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Status Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Create multiple submissions with original label
+            // Create multiple submissions with key (not label)
             const submission1 = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: 'Active' },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: 'status_active' },  // Use key, not label
             });
+            validateSubmissionIds(submission1);
 
             const submission2 = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: 'Active' },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: 'status_active' },  // Use key, not label
             });
+            // Note: Not validating submission2 for brevity
 
             // Change the label
-            await checkops.updateOptionLabel(question.id, 'status_active', 'Live');
+            await checkops.updateOptionLabel(question.id, 'status_active', 'Live');  // Use UUID
 
-            // Submit with new label
+            // Submit with key (not new label)
             const submission3 = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: 'Live' },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: 'status_active' },  // Use key, not label
             });
+            // Note: Not validating submission3 for brevity
 
             // Verify all submissions reference correct key
-            const retrieved1 = await checkops.getSubmission(submission1.id);
-            const retrieved2 = await checkops.getSubmission(submission2.id);
-            const retrieved3 = await checkops.getSubmission(submission3.id);
+            const retrieved1 = await checkops.getSubmission(submission1.id);  // Use UUID
+            const retrieved2 = await checkops.getSubmission(submission2.id);  // Use UUID
+            const retrieved3 = await checkops.getSubmission(submission3.id);  // Use UUID
 
             expect(retrieved1._rawData[question.id]).toBe('status_active');
             expect(retrieved2._rawData[question.id]).toBe('status_active');
@@ -185,7 +198,7 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
             expect(retrieved3.submissionData[question.id]).toBe('Live');
 
             // Stats should aggregate correctly
-            const stats = await checkops.getSubmissionStats(form.id);
+            const stats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats.totalSubmissions).toBe(3);
             expect(stats.questionStats[question.id].answerDistribution['Live']).toBe(3);
         });
@@ -198,34 +211,38 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
                 questionType: 'select',
                 options: [{ key: 'priority_high', label: 'High' }],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Submit initial response
+            // Submit initial response with key
             const sub1 = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: 'High' },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: 'priority_high' },  // Use key, not label
             });
+            validateSubmissionIds(sub1);
 
             // Change label
-            await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical');
+            await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical');  // Use UUID
 
-            // Read submission and submit new response after label change
-            const retrieved1 = await checkops.getSubmission(sub1.id);
+            // Read submission and submit new response with key (not new label)
+            const retrieved1 = await checkops.getSubmission(sub1.id);  // Use UUID
             const newSubmission = await checkops.createSubmission({
-                formId: form.id,
-                submissionData: { [question.id]: 'Critical' },
+                formId: form.id,  // Use UUID
+                submissionData: { [question.id]: 'priority_high' },  // Use key, not label
             });
+            validateSubmissionIds(newSubmission);
 
             // First submission should show updated label
             expect(retrieved1.submissionData[question.id]).toBe('Critical');
             expect(retrieved1._rawData[question.id]).toBe('priority_high');
 
             // New submission should also be correct
-            const retrievedNew = await checkops.getSubmission(newSubmission.id);
+            const retrievedNew = await checkops.getSubmission(newSubmission.id);  // Use UUID
             expect(retrievedNew.submissionData[question.id]).toBe('Critical');
             expect(retrievedNew._rawData[question.id]).toBe('priority_high');
         });
@@ -239,17 +256,19 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
                 questionText: 'Test',
                 questionType: 'text',
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Test Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
             // Create many concurrent operations
             const operations = Array.from({ length: 50 }, (_, i) =>
                 checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: `Response ${i}` },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: `Response ${i}` },  // Use UUID as key
                 })
             );
 
@@ -257,9 +276,11 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
 
             expect(results).toHaveLength(50);
             expect(results.every(r => r.id)).toBe(true);
+            // Validate first result as sample
+            validateSubmissionIds(results[0]);
 
             // Verify all stored correctly
-            const stats = await checkops.getSubmissionStats(form.id);
+            const stats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats.totalSubmissions).toBe(50);
         });
 
@@ -275,33 +296,37 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
                     { key: 'opt_3', label: 'Option 3' },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Multiselect Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Submit first batch with original labels
+            // Submit first batch with keys (not labels)
             for (let i = 0; i < 10; i++) {
                 await checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: ['Option 1', 'Option 2'] },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: ['opt_1', 'opt_2'] },  // Use keys, not labels
                 });
+                // Note: Not validating each submission in loop for performance
             }
 
             // Change label
-            await checkops.updateOptionLabel(question.id, 'opt_1', 'First Option');
+            await checkops.updateOptionLabel(question.id, 'opt_1', 'First Option');  // Use UUID
 
-            // Submit second batch with new label
+            // Submit second batch with keys (not new label)
             for (let i = 0; i < 10; i++) {
                 await checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: ['First Option', 'Option 3'] },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: ['opt_1', 'opt_3'] },  // Use keys, not labels
                 });
+                // Note: Not validating each submission in loop for performance
             }
 
             // Verify stats
-            const stats = await checkops.getSubmissionStats(form.id);
+            const stats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(stats.totalSubmissions).toBe(20);
         });
     });
@@ -318,37 +343,40 @@ describe('Concurrent Operations: Race Conditions & High Load', () => {
                     { key: 'rate_5', label: 'Excellent' },
                 ],
             });
+            validateQuestionIds(question);
 
             const form = await checkops.createForm({
                 title: 'Rating Form',
-                questions: [{ questionId: question.id }],
+                questions: [{ questionId: question.id }],  // Use UUID
             });
+            validateFormIds(form);
 
-            // Add some initial submissions
+            // Add some initial submissions with keys
             for (let i = 0; i < 10; i++) {
                 await checkops.createSubmission({
-                    formId: form.id,
-                    submissionData: { [question.id]: 'Poor' },
+                    formId: form.id,  // Use UUID
+                    submissionData: { [question.id]: 'rate_1' },  // Use key, not label
                 });
+                // Note: Not validating each submission in loop for performance
             }
 
             // Concurrently add more submissions and read stats multiple times
             const operations = [
                 ...Array.from({ length: 20 }, () =>
                     checkops.createSubmission({
-                        formId: form.id,
-                        submissionData: { [question.id]: 'Excellent' },
+                        formId: form.id,  // Use UUID
+                        submissionData: { [question.id]: 'rate_5' },  // Use key, not label
                     })
                 ),
                 ...Array.from({ length: 3 }, () =>
-                    checkops.getSubmissionStats(form.id)
+                    checkops.getSubmissionStats(form.id)  // Use UUID
                 ),
             ];
 
             const results = await Promise.all(operations);
 
             // Final stats should show all submissions
-            const finalStats = await checkops.getSubmissionStats(form.id);
+            const finalStats = await checkops.getSubmissionStats(form.id);  // Use UUID
             expect(finalStats.totalSubmissions).toBe(30);
             expect(finalStats.questionStats[question.id].answerDistribution['Poor']).toBe(10);
             expect(finalStats.questionStats[question.id].answerDistribution['Excellent']).toBe(20);

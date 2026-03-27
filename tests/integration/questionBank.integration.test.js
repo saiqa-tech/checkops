@@ -1,4 +1,6 @@
 import CheckOps from '../../src/index.js';
+import { isUUID, isSID, validateQuestionIds } from '../helpers/validators.js';
+import { cleanupAllTestData } from '../helpers/cleanup.js';
 
 describe('Question Bank Integration Tests', () => {
   let checkops;
@@ -14,6 +16,8 @@ describe('Question Bank Integration Tests', () => {
 
     try {
       await checkops.initialize();
+      // Clean up any existing test data
+      await cleanupAllTestData(checkops);
     } catch (error) {
       console.log('Database not available for integration tests, skipping...');
     }
@@ -21,6 +25,8 @@ describe('Question Bank Integration Tests', () => {
 
   afterAll(async () => {
     if (checkops && checkops.initialized) {
+      // Clean up test data before closing
+      await cleanupAllTestData(checkops);
       await checkops.close();
     }
   });
@@ -36,17 +42,25 @@ describe('Question Bank Integration Tests', () => {
     it.skip('should create and retrieve questions', async () => {
       if (!checkops.initialized) return;
 
+      // Create question
       const question = await checkops.createQuestion({
         questionText: 'What is your email?',
         questionType: 'email',
       });
 
+      // Verify question has both UUID and SID
       expect(question).toBeDefined();
-      expect(question.id).toMatch(/^Q-\d+$/);
+      expect(isUUID(question.id)).toBe(true);
+      expect(isSID(question.sid, 'Q')).toBe(true);
+      validateQuestionIds(question);
 
+      // Retrieve question by UUID
       const retrieved = await checkops.getQuestion(question.id);
       expect(retrieved.questionText).toBe('What is your email?');
+      expect(retrieved.id).toBe(question.id);
+      expect(retrieved.sid).toBe(question.sid);
 
+      // Delete question by UUID
       await checkops.deleteQuestion(question.id);
     });
   });

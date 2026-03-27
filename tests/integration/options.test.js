@@ -1,5 +1,7 @@
 import CheckOps from '../../src/index.js';
 import { getPool } from '../../src/config/database.js';
+import { isUUID, isSID, validateFormIds, validateQuestionIds, validateSubmissionIds } from '../helpers/validators.js';
+import { cleanupAllTestData } from '../helpers/cleanup.js';
 
 describe('Options Integration Tests', () => {
   let checkops;
@@ -34,11 +36,8 @@ describe('Options Integration Tests', () => {
       return;
     }
 
-    await pool.query('DELETE FROM submissions');
-    await pool.query('DELETE FROM forms');
-    await pool.query('DELETE FROM question_bank');
-    await pool.query('DELETE FROM question_option_history');
-    await pool.query("UPDATE id_counters SET current_value = 0 WHERE entity_type IN ('FORM', 'Q', 'SUB')");
+    // Use cleanup helper to delete test data
+    await cleanupAllTestData(checkops);
   });
 
   describe('Simple Array Options', () => {
@@ -50,6 +49,9 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: ['Red', 'Blue', 'Green'],
       });
+
+      // Validate UUID and SID
+      validateQuestionIds(question);
 
       expect(question.options).toHaveLength(3);
       expect(question.options[0]).toHaveProperty('key');
@@ -71,6 +73,9 @@ describe('Options Integration Tests', () => {
           { key: 'priority_low', label: 'Low Priority' },
         ],
       });
+
+      // Validate UUID and SID
+      validateQuestionIds(question);
 
       expect(question.options).toHaveLength(3);
       expect(question.options[0].key).toBe('priority_high');
@@ -94,7 +99,7 @@ describe('Options Integration Tests', () => {
   });
 
   describe('Submission with Options', () => {
-    test('should accept label and convert to key on submission', async () => {
+    test('should accept key and store it correctly', async () => {
       if (!checkops) return;
 
       const question = await checkops.createQuestion({
@@ -102,21 +107,24 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High Priority' }],
       });
+      validateQuestionIds(question);
 
       const form = await checkops.createForm({
         title: 'Test Form',
-        questions: [{ questionId: question.id }],
+        questions: [{ questionId: question.id }],  // Use UUID
       });
+      validateFormIds(form);
 
       const submission = await checkops.createSubmission({
-        formId: form.id,
+        formId: form.id,  // Use UUID
         submissionData: {
-          [question.id]: 'High Priority',
+          [question.id]: 'priority_high',  // Use key, not label
         },
       });
+      validateSubmissionIds(submission);
 
       // Need to retrieve to get _rawData and submissionData transforms
-      const retrieved = await checkops.getSubmission(submission.id);
+      const retrieved = await checkops.getSubmission(submission.id);  // Use UUID
       expect(retrieved._rawData[question.id]).toBe('priority_high');
       expect(retrieved.submissionData[question.id]).toBe('High Priority');
     });
@@ -129,26 +137,29 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High Priority' }],
       });
+      validateQuestionIds(question);
 
       const form = await checkops.createForm({
         title: 'Test Form',
-        questions: [{ questionId: question.id }],
+        questions: [{ questionId: question.id }],  // Use UUID
       });
+      validateFormIds(form);
 
       const submission = await checkops.createSubmission({
-        formId: form.id,
+        formId: form.id,  // Use UUID
         submissionData: {
-          [question.id]: 'priority_high',
+          [question.id]: 'priority_high',  // Use UUID as key
         },
       });
+      validateSubmissionIds(submission);
 
       // Need to retrieve to get _rawData and submissionData transforms
-      const retrieved = await checkops.getSubmission(submission.id);
+      const retrieved = await checkops.getSubmission(submission.id);  // Use UUID
       expect(retrieved._rawData[question.id]).toBe('priority_high');
       expect(retrieved.submissionData[question.id]).toBe('High Priority');
     });
 
-    test('should handle multiselect with mixed keys and labels', async () => {
+    test('should handle multiselect with keys', async () => {
       if (!checkops) return;
 
       const question = await checkops.createQuestion({
@@ -160,21 +171,24 @@ describe('Options Integration Tests', () => {
           { key: 'color_green', label: 'Green' },
         ],
       });
+      validateQuestionIds(question);
 
       const form = await checkops.createForm({
         title: 'Test Form',
-        questions: [{ questionId: question.id }],
+        questions: [{ questionId: question.id }],  // Use UUID
       });
+      validateFormIds(form);
 
       const submission = await checkops.createSubmission({
-        formId: form.id,
+        formId: form.id,  // Use UUID
         submissionData: {
-          [question.id]: ['Red', 'color_blue'],
+          [question.id]: ['color_red', 'color_blue'],  // Use keys, not labels
         },
       });
+      validateSubmissionIds(submission);
 
       // Need to retrieve to get _rawData and submissionData transforms
-      const retrieved = await checkops.getSubmission(submission.id);
+      const retrieved = await checkops.getSubmission(submission.id);  // Use UUID
       expect(retrieved._rawData[question.id]).toEqual(['color_red', 'color_blue']);
       expect(retrieved.submissionData[question.id]).toEqual(['Red', 'Blue']);
     });
@@ -189,13 +203,15 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High Priority' }],
       });
+      validateQuestionIds(question);
 
       const updatedQuestion = await checkops.updateOptionLabel(
-        question.id,
+        question.id,  // Use UUID
         'priority_high',
         'Critical Priority',
         'admin@example.com'
       );
+      validateQuestionIds(updatedQuestion);
 
       expect(updatedQuestion.options[0].key).toBe('priority_high');
       expect(updatedQuestion.options[0].label).toBe('Critical Priority');
@@ -209,27 +225,31 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High Priority' }],
       });
+      validateQuestionIds(question);
 
       const form = await checkops.createForm({
         title: 'Test Form',
-        questions: [{ questionId: question.id }],
+        questions: [{ questionId: question.id }],  // Use UUID
       });
+      validateFormIds(form);
 
       const sub1 = await checkops.createSubmission({
-        formId: form.id,
-        submissionData: { [question.id]: 'High Priority' },
+        formId: form.id,  // Use UUID
+        submissionData: { [question.id]: 'priority_high' },  // Use key, not label
       });
+      validateSubmissionIds(sub1);
 
-      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical Priority');
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical Priority');  // Use UUID
 
       const sub2 = await checkops.createSubmission({
-        formId: form.id,
-        submissionData: { [question.id]: 'Critical Priority' },
+        formId: form.id,  // Use UUID
+        submissionData: { [question.id]: 'priority_high' },  // Use key, not label
       });
+      validateSubmissionIds(sub2);
 
       // Retrieve to get _rawData
-      const retrieved1 = await checkops.getSubmission(sub1.id);
-      const retrieved2 = await checkops.getSubmission(sub2.id);
+      const retrieved1 = await checkops.getSubmission(sub1.id);  // Use UUID
+      const retrieved2 = await checkops.getSubmission(sub2.id);  // Use UUID
 
       expect(retrieved1._rawData[question.id]).toBe('priority_high');
       expect(retrieved2._rawData[question.id]).toBe('priority_high');
@@ -247,18 +267,19 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High Priority' }],
       });
+      validateQuestionIds(question);
 
       await checkops.updateOptionLabel(
-        question.id,
+        question.id,  // Use UUID
         'priority_high',
         'Critical Priority',
         'admin@example.com'
       );
 
-      const history = await checkops.getOptionHistory(question.id, 'priority_high');
+      const history = await checkops.getOptionHistory(question.id, 'priority_high');  // Use UUID
 
       expect(history).toHaveLength(1);
-      expect(history[0].questionId).toBe(question.id);
+      expect(history[0].questionId).toBe(question.id);  // Should be UUID
       expect(history[0].optionKey).toBe('priority_high');
       expect(history[0].oldLabel).toBe('High Priority');
       expect(history[0].newLabel).toBe('Critical Priority');
@@ -278,30 +299,32 @@ describe('Options Integration Tests', () => {
           { key: 'priority_low', label: 'Low' },
         ],
       });
+      validateQuestionIds(question);
 
       const form = await checkops.createForm({
         title: 'Test Form',
-        questions: [{ questionId: question.id }],
+        questions: [{ questionId: question.id }],  // Use UUID
+      });
+      validateFormIds(form);
+
+      await checkops.createSubmission({
+        formId: form.id,  // Use UUID
+        submissionData: { [question.id]: 'priority_high' },  // Use key, not label
       });
 
       await checkops.createSubmission({
-        formId: form.id,
-        submissionData: { [question.id]: 'High' },
+        formId: form.id,  // Use UUID
+        submissionData: { [question.id]: 'priority_high' },  // Use key, not label
       });
+
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical');  // Use UUID
 
       await checkops.createSubmission({
-        formId: form.id,
-        submissionData: { [question.id]: 'High' },
+        formId: form.id,  // Use UUID
+        submissionData: { [question.id]: 'priority_high' },  // Use key, not label
       });
 
-      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical');
-
-      await checkops.createSubmission({
-        formId: form.id,
-        submissionData: { [question.id]: 'Critical' },
-      });
-
-      const stats = await checkops.getSubmissionStats(form.id);
+      const stats = await checkops.getSubmissionStats(form.id);  // Use UUID
 
       expect(stats.totalSubmissions).toBe(3);
       expect(stats.questionStats[question.id].totalAnswers).toBe(3);
@@ -320,23 +343,25 @@ describe('Options Integration Tests', () => {
           { key: 'color_blue', label: 'Blue' },
         ],
       });
+      validateQuestionIds(question);
 
       const form = await checkops.createForm({
         title: 'Test Form',
-        questions: [{ questionId: question.id }],
+        questions: [{ questionId: question.id }],  // Use UUID
+      });
+      validateFormIds(form);
+
+      await checkops.createSubmission({
+        formId: form.id,  // Use UUID
+        submissionData: { [question.id]: ['color_red', 'color_blue'] },  // Use keys, not labels
       });
 
       await checkops.createSubmission({
-        formId: form.id,
-        submissionData: { [question.id]: ['Red', 'Blue'] },
+        formId: form.id,  // Use UUID
+        submissionData: { [question.id]: ['color_red'] },  // Use keys, not labels
       });
 
-      await checkops.createSubmission({
-        formId: form.id,
-        submissionData: { [question.id]: ['Red'] },
-      });
-
-      const stats = await checkops.getSubmissionStats(form.id);
+      const stats = await checkops.getSubmissionStats(form.id);  // Use UUID
 
       expect(stats.questionStats[question.id].answerDistribution['Red']).toBe(2);
       expect(stats.questionStats[question.id].answerDistribution['Blue']).toBe(1);
@@ -352,18 +377,20 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High' }],
       });
+      validateQuestionIds(question);
 
       const form = await checkops.createForm({
         title: 'Test Form',
-        questions: [{ questionId: question.id, required: true }],
+        questions: [{ questionId: question.id, required: true }],  // Use UUID
       });
+      validateFormIds(form);
 
       await expect(
         checkops.createSubmission({
-          formId: form.id,
-          submissionData: { [question.id]: 'Invalid Option' },
+          formId: form.id,  // Use UUID
+          submissionData: { [question.id]: 'Invalid Option' },  // Use UUID as key
         })
-      ).rejects.toThrow(/Validation/);
+      ).rejects.toThrow(/validation/i);
     });
 
     test('should validate multiselect array values', async () => {
@@ -374,18 +401,20 @@ describe('Options Integration Tests', () => {
         questionType: 'multiselect',
         options: [{ key: 'color_red', label: 'Red' }],
       });
+      validateQuestionIds(question);
 
       const form = await checkops.createForm({
         title: 'Test Form',
-        questions: [{ questionId: question.id }],
+        questions: [{ questionId: question.id }],  // Use UUID
       });
+      validateFormIds(form);
 
       await expect(
         checkops.createSubmission({
-          formId: form.id,
-          submissionData: { [question.id]: ['Red', 'Invalid'] },
+          formId: form.id,  // Use UUID
+          submissionData: { [question.id]: ['Red', 'Invalid'] },  // Use UUID as key
         })
-      ).rejects.toThrow(/Validation/);
+      ).rejects.toThrow(/validation/i);
     });
   });
 
@@ -401,11 +430,12 @@ describe('Options Integration Tests', () => {
           { key: 'priority_low', label: 'Low Priority' },
         ],
       });
+      validateQuestionIds(question);
 
       // Query database directly to verify JSONB structure
       const result = await pool.query(
         'SELECT options FROM question_bank WHERE id = $1',
-        [question.id]
+        [question.id]  // Use UUID
       );
 
       const storedOptions = result.rows[0].options;
@@ -447,10 +477,11 @@ describe('Options Integration Tests', () => {
           { key: 'opt_3', label: 'Third', order: 2 },
         ],
       });
+      validateQuestionIds(question);
 
       const result = await pool.query(
         'SELECT options FROM question_bank WHERE id = $1',
-        [question.id]
+        [question.id]  // Use UUID
       );
 
       const storedOptions = result.rows[0].options;
@@ -473,10 +504,11 @@ describe('Options Integration Tests', () => {
           },
         ],
       });
+      validateQuestionIds(question);
 
       const result = await pool.query(
         'SELECT options FROM question_bank WHERE id = $1',
-        [question.id]
+        [question.id]  // Use UUID
       );
 
       const storedOptions = result.rows[0].options;
@@ -493,11 +525,13 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High' }],
       });
+      validateQuestionIds(question);
 
       // updateOptionLabel should only change label, not key
-      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical');
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical');  // Use UUID
 
-      const updated = await checkops.getQuestion(question.id);
+      const updated = await checkops.getQuestion(question.id);  // Use UUID
+      validateQuestionIds(updated);
       expect(updated.options[0].key).toBe('priority_high'); // Key unchanged
       expect(updated.options[0].label).toBe('Critical'); // Label changed
     });
@@ -510,14 +544,16 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High' }],
       });
+      validateQuestionIds(question);
 
       const originalKey = question.options[0].key;
 
-      await checkops.updateOptionLabel(question.id, originalKey, 'Critical');
-      await checkops.updateOptionLabel(question.id, originalKey, 'Very Critical');
-      await checkops.updateOptionLabel(question.id, originalKey, 'Extremely Critical');
+      await checkops.updateOptionLabel(question.id, originalKey, 'Critical');  // Use UUID
+      await checkops.updateOptionLabel(question.id, originalKey, 'Very Critical');  // Use UUID
+      await checkops.updateOptionLabel(question.id, originalKey, 'Extremely Critical');  // Use UUID
 
-      const updated = await checkops.getQuestion(question.id);
+      const updated = await checkops.getQuestion(question.id);  // Use UUID
+      validateQuestionIds(updated);
       expect(updated.options[0].key).toBe(originalKey);
       expect(updated.options[0].label).toBe('Extremely Critical');
     });
@@ -534,11 +570,12 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High' }],
       });
+      validateQuestionIds(question);
 
       await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
 
       await checkops.updateOptionLabel(
-        question.id,
+        question.id,  // Use UUID
         'priority_high',
         'Critical',
         'admin@example.com'
@@ -546,7 +583,7 @@ describe('Options Integration Tests', () => {
 
       const afterUpdate = new Date();
 
-      const history = await checkops.getOptionHistory(question.id, 'priority_high');
+      const history = await checkops.getOptionHistory(question.id, 'priority_high');  // Use UUID
 
       expect(history).toHaveLength(1);
       const historyRecord = history[0];
@@ -564,12 +601,13 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High' }],
       });
+      validateQuestionIds(question);
 
-      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical', 'user1');
-      await checkops.updateOptionLabel(question.id, 'priority_high', 'Very Critical', 'user2');
-      await checkops.updateOptionLabel(question.id, 'priority_high', 'Extremely Critical', 'user3');
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical', 'user1');  // Use UUID
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Very Critical', 'user2');  // Use UUID
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Extremely Critical', 'user3');  // Use UUID
 
-      const history = await checkops.getOptionHistory(question.id, 'priority_high');
+      const history = await checkops.getOptionHistory(question.id, 'priority_high');  // Use UUID
 
       expect(history).toHaveLength(3);
 
@@ -588,18 +626,20 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High' }],
       });
+      validateQuestionIds(question1);
 
       const question2 = await checkops.createQuestion({
         questionText: 'Select status',
         questionType: 'select',
         options: [{ key: 'status_active', label: 'Active' }],
       });
+      validateQuestionIds(question2);
 
-      await checkops.updateOptionLabel(question1.id, 'priority_high', 'Critical');
-      await checkops.updateOptionLabel(question2.id, 'status_active', 'Live');
+      await checkops.updateOptionLabel(question1.id, 'priority_high', 'Critical');  // Use UUID
+      await checkops.updateOptionLabel(question2.id, 'status_active', 'Live');  // Use UUID
 
-      const history1 = await checkops.getOptionHistory(question1.id, 'priority_high');
-      const history2 = await checkops.getOptionHistory(question2.id, 'status_active');
+      const history1 = await checkops.getOptionHistory(question1.id, 'priority_high');  // Use UUID
+      const history2 = await checkops.getOptionHistory(question2.id, 'status_active');  // Use UUID
 
       expect(history1).toHaveLength(1);
       expect(history1[0].optionKey).toBe('priority_high');
@@ -616,10 +656,11 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'priority_high', label: 'High' }],
       });
+      validateQuestionIds(question);
 
-      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical', null);
+      await checkops.updateOptionLabel(question.id, 'priority_high', 'Critical', null);  // Use UUID
 
-      const history = await checkops.getOptionHistory(question.id, 'priority_high');
+      const history = await checkops.getOptionHistory(question.id, 'priority_high');  // Use UUID
 
       expect(history).toHaveLength(1);
       expect(history[0].changedBy).toBeNull();
@@ -637,6 +678,7 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: [{ key: 'long_opt', label: longLabel }],
       });
+      validateQuestionIds(question);
 
       expect(question.options[0].label).toBe(longLabel);
       expect(question.options[0].label.length).toBe(5000);
@@ -655,13 +697,14 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: manyOptions,
       });
+      validateQuestionIds(question);
 
       expect(question.options).toHaveLength(150);
 
       // Verify all stored correctly in database
       const result = await pool.query(
         'SELECT options FROM question_bank WHERE id = $1',
-        [question.id]
+        [question.id]  // Use UUID
       );
 
       expect(result.rows[0].options).toHaveLength(150);
@@ -681,23 +724,26 @@ describe('Options Integration Tests', () => {
           { key: 'lang_emoji', label: '🔴🔵🟢' },
         ],
       });
+      validateQuestionIds(question);
 
       expect(question.options[0].label).toBe('日本語');
       expect(question.options[4].label).toBe('🔴🔵🟢');
 
-      // Verify submission works with unicode labels
+      // Verify submission works with keys (not unicode labels)
       const form = await checkops.createForm({
         title: 'Test Form',
-        questions: [{ questionId: question.id }],
+        questions: [{ questionId: question.id }],  // Use UUID
       });
+      validateFormIds(form);
 
       const submission = await checkops.createSubmission({
-        formId: form.id,
-        submissionData: { [question.id]: '日本語' },
+        formId: form.id,  // Use UUID
+        submissionData: { [question.id]: 'lang_ja' },  // Use key, not label
       });
+      validateSubmissionIds(submission);
 
       // Retrieve to get the labels
-      const retrieved = await checkops.getSubmission(submission.id);
+      const retrieved = await checkops.getSubmission(submission.id);  // Use UUID
       expect(retrieved.submissionData[question.id]).toBe('日本語');
       expect(retrieved._rawData[question.id]).toBe('lang_ja');
     });
@@ -710,6 +756,7 @@ describe('Options Integration Tests', () => {
         questionType: 'select',
         options: ['', 'Non-empty', ''],
       });
+      validateQuestionIds(question);
 
       expect(question.options).toHaveLength(3);
       expect(question.options[0].label).toBe('');

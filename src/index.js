@@ -2,6 +2,7 @@ import { initializeDatabase, closeDatabase, testConnection } from './config/data
 import { FormService } from './services/FormService.js';
 import { QuestionService } from './services/QuestionService.js';
 import { SubmissionService } from './services/SubmissionService.js';
+import { FindingService } from './services/FindingService.js';
 import * as errors from './utils/errors.js';
 import { metricsCollector, performanceMonitor } from './utils/metrics.js';
 import { productionMetrics, metricsMiddleware, getHealthCheckData } from './utils/productionMetrics.js';
@@ -15,6 +16,7 @@ export class CheckOps {
     this.formService = null;
     this.questionService = null;
     this.submissionService = null;
+    this.findingService = null;
   }
 
   async initialize() {
@@ -29,6 +31,7 @@ export class CheckOps {
       this.formService = new FormService();
       this.questionService = new QuestionService();
       this.submissionService = new SubmissionService();
+      this.findingService = new FindingService();
 
       this.initialized = true;
     } catch (error) {
@@ -46,6 +49,7 @@ export class CheckOps {
     this.formService = null;
     this.questionService = null;
     this.submissionService = null;
+    this.findingService = null;
   }
 
   ensureInitialized() {
@@ -71,22 +75,22 @@ export class CheckOps {
 
   async updateForm(id, updates) {
     this.ensureInitialized();
-    return await this.formService.updateForm(id, updates);
+    return await this.formService.updateFormById(id, updates);
   }
 
   async deleteForm(id) {
     this.ensureInitialized();
-    return await this.formService.deleteForm(id);
+    return await this.formService.deleteFormById(id);
   }
 
   async deactivateForm(id) {
     this.ensureInitialized();
-    return await this.formService.deactivateForm(id);
+    return await this.formService.deactivateFormById(id);
   }
 
   async activateForm(id) {
     this.ensureInitialized();
-    return await this.formService.activateForm(id);
+    return await this.formService.activateFormById(id);
   }
 
   async getFormCount(options) {
@@ -122,22 +126,22 @@ export class CheckOps {
 
   async updateQuestion(id, updates) {
     this.ensureInitialized();
-    return await this.questionService.updateQuestion(id, updates);
+    return await this.questionService.updateQuestionById(id, updates);
   }
 
   async deleteQuestion(id) {
     this.ensureInitialized();
-    return await this.questionService.deleteQuestion(id);
+    return await this.questionService.deleteQuestionById(id);
   }
 
   async deactivateQuestion(id) {
     this.ensureInitialized();
-    return await this.questionService.deactivateQuestion(id);
+    return await this.questionService.deactivateQuestionById(id);
   }
 
   async activateQuestion(id) {
     this.ensureInitialized();
-    return await this.questionService.activateQuestion(id);
+    return await this.questionService.activateQuestionById(id);
   }
 
   async getQuestionCount(options) {
@@ -167,12 +171,12 @@ export class CheckOps {
 
   async updateSubmission(id, updates) {
     this.ensureInitialized();
-    return await this.submissionService.updateSubmission(id, updates);
+    return await this.submissionService.updateSubmissionById(id, updates);
   }
 
   async deleteSubmission(id) {
     this.ensureInitialized();
-    return await this.submissionService.deleteSubmission(id);
+    return await this.submissionService.deleteSubmissionById(id);
   }
 
   async getSubmissionCount(options) {
@@ -182,17 +186,68 @@ export class CheckOps {
 
   async getSubmissionStats(formId) {
     this.ensureInitialized();
-    return await this.submissionService.getSubmissionStats(formId);
+    return await this.submissionService.getSubmissionStatsById(formId);
+  }
+
+  // Finding methods
+  async createFinding(params) {
+    this.ensureInitialized();
+    return await this.findingService.createFinding(params);
+  }
+
+  async getFinding(id) {
+    this.ensureInitialized();
+    return await this.findingService.getFindingById(id);
+  }
+
+  async getFindingsByForm(formId, options) {
+    this.ensureInitialized();
+    return await this.findingService.getFindingsByFormId(formId, options);
+  }
+
+  async getFindingsBySubmission(submissionId) {
+    this.ensureInitialized();
+    return await this.findingService.getFindingsBySubmissionId(submissionId);
+  }
+
+  async getFindingsByQuestion(questionId, options) {
+    this.ensureInitialized();
+    return await this.findingService.getFindingsByQuestionId(questionId, options);
+  }
+
+  async getFindings(filters) {
+    this.ensureInitialized();
+    return await this.findingService.getFindings(filters);
+  }
+
+  async updateFinding(id, updates) {
+    this.ensureInitialized();
+    return await this.findingService.updateFindingById(id, updates);
+  }
+
+  async deleteFinding(id) {
+    this.ensureInitialized();
+    return await this.findingService.deleteFindingById(id);
+  }
+
+  async getFindingCount(filters) {
+    this.ensureInitialized();
+    return await this.findingService.getFindingCount(filters);
+  }
+
+  async getFindingsStats(formId) {
+    this.ensureInitialized();
+    return await this.findingService.getFindingsStats(formId);
   }
 
   async updateOptionLabel(questionId, optionKey, newLabel, changedBy = null) {
     this.ensureInitialized();
-    return await this.questionService.updateOptionLabel(questionId, optionKey, newLabel, changedBy);
+    return await this.questionService.updateOptionLabelById(questionId, optionKey, newLabel, changedBy);
   }
 
   async getOptionHistory(questionId, optionKey = null) {
     this.ensureInitialized();
-    return await this.questionService.getOptionHistory(questionId, optionKey);
+    return await this.questionService.getOptionHistoryById(questionId, optionKey);
   }
 
   // Cache management methods for v3.0.0 MCP server
@@ -256,6 +311,7 @@ export {
   FormService,
   QuestionService,
   SubmissionService,
+  FindingService,
   // Phase 4: Performance Monitoring & Testing
   metricsCollector,
   performanceMonitor,

@@ -1,7 +1,7 @@
 {
   "name": "@saiqa-tech/checkops",
-  "version": "3.1.0",
-  "description": "A high-performance, production-ready Node.js package for creating dynamic forms with advanced optimizations, real-time monitoring, centralized question reusability, and enterprise-grade performance capabilities",
+  "version": "4.0.0",
+  "description": "A high-performance, production-ready Node.js package for creating dynamic forms with dual-ID system (UUID + human-readable), advanced optimizations, real-time monitoring, centralized question reusability, and enterprise-grade performance capabilities",
   "main": "src/index.js",
   "type": "module",
   "bin": {
@@ -23,6 +23,7 @@
     "test:power": "NODE_OPTIONS=--experimental-vm-modules jest tests/checkops-power",
     "test:baseline": "NODE_OPTIONS=--experimental-vm-modules jest --maxWorkers=1 --logHeapUsage tests/unit",
     "migrate": "node migrations/run.js",
+    "migrate:v4": "node scripts/migrate-v4.js",
     "lint": "eslint src tests",
     "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\""
   },
@@ -73,8 +74,10 @@
     "src",
     "bin",
     "migrations",
+    "scripts",
     "docs",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "UPGRADE_GUIDE_V4.md"
   ]
 }
