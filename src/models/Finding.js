@@ -30,6 +30,7 @@ export class Finding {
         this.metadata = data.metadata;
         this.createdAt = data.createdAt ?? data.created_at;
         this.createdBy = data.createdBy ?? data.created_by;
+        this.targetUnitId = data.targetUnitId ?? data.target_unit_id ?? null;
     }
 
     toJSON() {
@@ -52,6 +53,7 @@ export class Finding {
             metadata: this.metadata,
             createdAt: this.createdAt,
             createdBy: this.createdBy,
+            targetUnitId: this.targetUnitId,
         };
     }
 
@@ -76,6 +78,7 @@ export class Finding {
             metadata: row.metadata,
             createdAt: row.created_at,
             createdBy: row.created_by,
+            targetUnitId: row.target_unit_id,
         });
     }
 
@@ -112,9 +115,10 @@ export class Finding {
     }) {
         const pool = getPool();
 
-        // Look up parent SIDs in one query
+        // Look up parent SIDs (and the submission's target_unit_id) in one query
         const sidResult = await pool.query(
-            `SELECT s.sid AS submission_sid, q.sid AS question_sid, f.sid AS form_sid
+            `SELECT s.sid AS submission_sid, q.sid AS question_sid, f.sid AS form_sid,
+                    s.target_unit_id
              FROM submissions s, question_bank q, forms f
              WHERE s.id = $1 AND q.id = $2 AND f.id = $3`,
             [submissionId, questionId, formId]
@@ -124,7 +128,7 @@ export class Finding {
             throw new NotFoundError('Submission, Question, or Form', `${submissionId} / ${questionId} / ${formId}`);
         }
 
-        const { submission_sid, question_sid, form_sid } = sidResult.rows[0];
+        const { submission_sid, question_sid, form_sid, target_unit_id } = sidResult.rows[0];
 
         // Generate SID (human-readable ID)
         const counter = await getNextSIDCounter('finding');
@@ -136,8 +140,8 @@ export class Finding {
                 `INSERT INTO public.findings (
           sid, submission_id, submission_sid, question_id, question_sid,
           form_id, form_sid, severity, department, observation, root_cause,
-          evidence_urls, assignment, status, metadata, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          evidence_urls, assignment, status, metadata, created_by, target_unit_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         RETURNING *`,
                 [
                     sid,
@@ -155,7 +159,8 @@ export class Finding {
                     JSON.stringify(assignment),
                     status,
                     JSON.stringify(metadata),
-                    createdBy
+                    createdBy,
+                    target_unit_id
                 ]
             );
 

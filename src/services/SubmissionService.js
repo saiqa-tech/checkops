@@ -17,7 +17,7 @@ export class SubmissionService {
    * @param {object} params.metadata - Metadata
    * @returns {Promise<Submission>}
    */
-  async createSubmission({ formId, submissionData, metadata = {} }) {
+  async createSubmission({ formId, submissionData, metadata = {}, targetUnitId = null, submitterUserId = null }) {
     validateRequired(formId, 'Form ID');
     validateRequired(submissionData, 'Submission data');
 
@@ -41,6 +41,8 @@ export class SubmissionService {
       formId,
       submissionData: sanitizedSubmissionData,
       metadata: sanitizedMetadata,
+      targetUnitId,
+      submitterUserId,
     });
 
     // Invalidate stats cache since we have a new submission

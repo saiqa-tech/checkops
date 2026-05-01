@@ -7,7 +7,7 @@ import { checkOpsCache } from '../utils/cache.js';
 import { metricsCollector, performanceMonitor } from '../utils/metrics.js';
 
 export class FormService {
-  async createForm({ title, description = '', questions, metadata = {} }) {
+  async createForm({ title, description = '', questions, metadata = {}, requireAll = true }) {
     const start = performance.now();
     let error = null;
 
@@ -27,6 +27,7 @@ export class FormService {
         description: sanitizedData.description,
         questions: enrichedQuestions,
         metadata: sanitizedData.metadata,
+        requireAll,
       });
 
       checkOpsCache.setForm(form.id, form);
@@ -159,6 +160,10 @@ export class FormService {
 
     if (updates.metadata !== undefined) {
       sanitizedUpdates.metadata = sanitizeObject(updates.metadata);
+    }
+
+    if (updates.requireAll !== undefined) {
+      sanitizedUpdates.requireAll = updates.requireAll;
     }
 
     if (updates.isActive !== undefined) {

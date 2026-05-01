@@ -58,9 +58,9 @@ export class CheckOps {
     }
   }
 
-  async createForm({ title, description, questions, metadata }) {
+  async createForm({ title, description, questions, metadata, requireAll }) {
     this.ensureInitialized();
-    return await this.formService.createForm({ title, description, questions, metadata });
+    return await this.formService.createForm({ title, description, questions, metadata, requireAll });
   }
 
   async getForm(id) {
@@ -149,9 +149,9 @@ export class CheckOps {
     return await this.questionService.getQuestionCount(options);
   }
 
-  async createSubmission({ formId, submissionData, metadata }) {
+  async createSubmission({ formId, submissionData, metadata, targetUnitId, submitterUserId }) {
     this.ensureInitialized();
-    return await this.submissionService.createSubmission({ formId, submissionData, metadata });
+    return await this.submissionService.createSubmission({ formId, submissionData, metadata, targetUnitId, submitterUserId });
   }
 
   async getSubmission(id) {
