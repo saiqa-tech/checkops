@@ -31,7 +31,8 @@ describe('Phase 3.1: Enhanced Batch Operations', () => {
                         required: false
                     }
                 ],
-                metadata: { batch: true, index: i }
+                metadata: { batch: true, index: i },
+                requireAll: i % 2 === 0
             }));
 
             const startTime = performance.now();
@@ -44,6 +45,7 @@ describe('Phase 3.1: Enhanced Batch Operations', () => {
                 expect(form.title).toBe(`Batch Form ${i}`);
                 expect(form.metadata.batch).toBe(true);
                 expect(form.metadata.index).toBe(i);
+                expect(form.requireAll).toBe(i % 2 === 0);
             });
 
             // Should be faster than individual creates
@@ -130,6 +132,9 @@ describe('Phase 3.1: Enhanced Batch Operations', () => {
 
     describe('Submission Batch Operations', () => {
         test('should create multiple submissions efficiently', async () => {
+            const targetUnitId = '11111111-1111-1111-1111-111111111111';
+            const submitterUserId = '22222222-2222-2222-2222-222222222222';
+
             // First create a form
             const form = await Form.create({
                 title: 'Batch Submission Test Form',
@@ -149,7 +154,9 @@ describe('Phase 3.1: Enhanced Batch Operations', () => {
                 submissionData: {
                     [form.questions[0].id || 'test']: `Answer ${i}`
                 },
-                metadata: { batch: true, index: i }
+                metadata: { batch: true, index: i },
+                targetUnitId,
+                submitterUserId
             }));
 
             const startTime = performance.now();
@@ -161,6 +168,8 @@ describe('Phase 3.1: Enhanced Batch Operations', () => {
             submissions.forEach((submission, i) => {
                 expect(submission.formId).toBe(form.id);
                 expect(submission.metadata.batch).toBe(true);
+                expect(submission.targetUnitId).toBe(targetUnitId);
+                expect(submission.submitterUserId).toBe(submitterUserId);
             });
 
             expect(duration).toBeLessThan(400); // Less than 400ms for 25 submissions

@@ -52,9 +52,9 @@ export class Submission {
       submissionData: row.submission_data,
       metadata: row.metadata,
       submittedAt: row.submitted_at,
-      // Phase 3: map snake_case DB columns to camelCase fields
-      target_unit_id: row.target_unit_id,
-      submitter_user_id: row.submitter_user_id,
+      // Phase 3: map snake_case DB columns to camelCase constructor fields
+      targetUnitId: row.target_unit_id,
+      submitterUserId: row.submitter_user_id,
     });
   }
 
@@ -317,20 +317,22 @@ export class Submission {
         }
 
         placeholders.push(
-          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`
+          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`
         );
         values.push(
           sid,
           formId,
           formSid,
           JSON.stringify(submissionData.submissionData),
-          JSON.stringify(submissionData.metadata || {})
+          JSON.stringify(submissionData.metadata || {}),
+          submissionData.targetUnitId ?? null,
+          submissionData.submitterUserId ?? null
         );
-        paramIndex += 5;
+        paramIndex += 7;
       });
 
       const query = `
-        INSERT INTO submissions (sid, form_id, form_sid, submission_data, metadata)
+        INSERT INTO submissions (sid, form_id, form_sid, submission_data, metadata, target_unit_id, submitter_user_id)
         VALUES ${placeholders.join(', ')}
         RETURNING *
       `;
