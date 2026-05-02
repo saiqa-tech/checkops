@@ -7,6 +7,8 @@ import { sanitizeObject } from '../utils/sanitization.js';
 import { OptionUtils } from '../utils/optionUtils.js';
 import { getPool } from '../config/database.js';
 import { checkOpsCache } from '../utils/cache.js';
+import { ValidationError } from '../utils/errors.js';
+import { isUUID } from '../utils/idResolver.js';
 
 export class SubmissionService {
   /**
@@ -20,6 +22,10 @@ export class SubmissionService {
   async createSubmission({ formId, submissionData, metadata = {}, targetUnitId = null, submitterUserId = null }) {
     validateRequired(formId, 'Form ID');
     validateRequired(submissionData, 'Submission data');
+
+    if (!isUUID(formId)) {
+      throw new ValidationError('Valid form UUID is required');
+    }
 
     const form = await Form.findById(formId);
 

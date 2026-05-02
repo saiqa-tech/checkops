@@ -258,7 +258,7 @@ export class Form {
                 const sid = sids[index];
                 const enhancedMetadata = Form.buildEnhancedMetadata(formData.questions, formData.metadata);
                 placeholders.push(
-                    `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5})`
+                    `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`
                 );
                 values.push(
                     sid,
@@ -266,13 +266,14 @@ export class Form {
                     formData.description || '',
                     JSON.stringify(formData.questions),
                     JSON.stringify(enhancedMetadata),
+                    formData.requireAll ?? true,
                     true
                 );
-                paramIndex += 6;
+                paramIndex += 7;
             });
 
             const query = `
-        INSERT INTO forms (sid, title, description, questions, metadata, is_active)
+        INSERT INTO forms (sid, title, description, questions, metadata, require_all, is_active)
         VALUES ${placeholders.join(', ')}
         RETURNING *
       `;

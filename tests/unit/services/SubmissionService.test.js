@@ -25,15 +25,24 @@ describe('SubmissionService', () => {
       ).rejects.toThrow(ValidationError);
     });
 
+    it('should throw validation error for invalid formId format', async () => {
+      await expect(
+        submissionService.createSubmission({
+          formId: 'FORM-001',
+          submissionData: { name: 'Test' },
+        })
+      ).rejects.toThrow(new ValidationError('Valid form UUID is required'));
+    });
+
     it('should throw validation error for missing submission ID in update', async () => {
       await expect(
-        submissionService.updateSubmission(null, { metadata: {} })
+        submissionService.updateSubmissionById(null, { metadata: {} })
       ).rejects.toThrow(ValidationError);
     });
 
     it('should throw validation error for missing submission ID in delete', async () => {
       await expect(
-        submissionService.deleteSubmission(null)
+        submissionService.deleteSubmissionById(null)
       ).rejects.toThrow(ValidationError);
     });
 
