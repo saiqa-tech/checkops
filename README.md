@@ -34,13 +34,13 @@ npm install @saiqa-tech/checkops pg
 
 ### 1. Initialize Database
 
-First, run the database migrations:
+First, create a PostgreSQL database named `checkops`, then run the database migrations:
 
 ```bash
 # Set your database credentials
 export DB_HOST=localhost
 export DB_PORT=5432
-export DB_NAME=your_database
+export DB_NAME=checkops
 export DB_USER=postgres
 export DB_PASSWORD=your_password
 
@@ -56,7 +56,7 @@ import CheckOps from '@saiqa-tech/checkops';
 const checkops = new CheckOps({
   host: 'localhost',
   port: 5432,
-  database: 'your_database',
+  database: 'checkops',
   user: 'postgres',
   password: 'your_password',
 });

@@ -234,6 +234,26 @@ npm run test:integration
 npm run test:coverage
 ```
 
+### Test Tiers and Merge Policy
+
+Not all test suites have the same requirements. Understanding the tiers prevents
+confusion between "this test is failing because the code is wrong" and "this test
+is failing because the environment is not set up for this tier."
+
+| Tier | Command | Requires DB | Required to merge? |
+|------|---------|------------|-------------------|
+| **Unit / correctness** | `npm run test:unit` | No | **Yes** — must pass before any PR merges |
+| **Integration** | `npm run test:integration` | Yes | **Yes** — must pass when a DB is available in CI |
+| **Performance** | `npm run test:performance` | Yes | No — run on demand or as a release gate, not on every PR |
+| **Load** | `npm run test:power` | Yes | No — run on demand only |
+
+**Rules:**
+
+1. `npm run test:unit` is the minimum always-runnable correctness gate. If it fails, the PR is blocked.
+2. `npm run test:integration` must pass in any environment where a PostgreSQL database is available. Use `assertDbReady()` from `tests/helpers/db-preflight.js` in every integration `beforeAll` so failures surface as actionable messages rather than silent skips.
+3. Performance and load tests are not merge gates. They should be run as part of a release process or scheduled pipeline, not on every PR.
+4. If a DB-backed test fails, first confirm whether it is an environment issue (DB unreachable, migrations not applied) or a product defect. `assertDbReady()` catches environment issues up front.
+
 ### Writing Tests
 
 Place tests in the appropriate directory:

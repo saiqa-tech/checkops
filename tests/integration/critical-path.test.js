@@ -2,12 +2,18 @@ import CheckOps from '../../src/index.js';
 import { getPool } from '../../src/config/database.js';
 import { isUUID, isSID, validateFormIds, validateQuestionIds, validateSubmissionIds } from '../helpers/validators.js';
 import { cleanupAllTestData } from '../helpers/cleanup.js';
+import { assertDbReady } from '../helpers/db-preflight.js';
 
 describe('Critical Path: End-to-End Option Key System', () => {
     let checkops;
     let pool;
 
     beforeAll(async () => {
+        // Preflight: surface actionable diagnostics before trying to initialize.
+        // If the DB is unreachable or migrations are missing this throws a clear
+        // error that Jest reports as a setup failure — not a silent skip.
+        await assertDbReady();
+
         checkops = new CheckOps({
             host: process.env.DB_HOST || 'localhost',
             port: process.env.DB_PORT || 5432,
@@ -15,14 +21,8 @@ describe('Critical Path: End-to-End Option Key System', () => {
             user: process.env.DB_USER || 'postgres',
             password: process.env.DB_PASSWORD || 'postgres',
         });
-
-        try {
-            await checkops.initialize();
-            pool = getPool();
-        } catch (error) {
-            console.log('Database not available, skipping critical path tests');
-            checkops = null;
-        }
+        await checkops.initialize();
+        pool = getPool();
     });
 
     afterAll(async () => {
@@ -32,19 +32,12 @@ describe('Critical Path: End-to-End Option Key System', () => {
     });
 
     beforeEach(async () => {
-        if (!checkops) {
-            return;
-        }
-
         // Use cleanup helper to delete test data
         await cleanupAllTestData(checkops);
     });
 
     describe('Complete Workflow: Form Creation → Submission → Label Change → Statistics', () => {
-        test('should maintain data integrity through complete workflow', async () => {
-            if (!checkops) return;
-
-            // Step 1: Create a question with options
+        test('should maintain data integrity through complete workflow', async () => {            // Step 1: Create a question with options
             const question = await checkops.createQuestion({
                 questionText: 'What is your priority level?',
                 questionType: 'select',
@@ -162,7 +155,6 @@ describe('Critical Path: End-to-End Option Key System', () => {
         });
 
         test('should handle multiselect option changes with statistics aggregation', async () => {
-            if (!checkops) return;
 
             // Create multiselect question
             const question = await checkops.createQuestion({
@@ -221,7 +213,6 @@ describe('Critical Path: End-to-End Option Key System', () => {
         });
 
         test('should handle option key immutability across complex workflows', async () => {
-            if (!checkops) return;
 
             const question = await checkops.createQuestion({
                 questionText: 'Select rating',
